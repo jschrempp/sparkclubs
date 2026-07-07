@@ -1,14 +1,23 @@
 # Railway Deployment Guide
 
-This guide walks you through deploying the Book Clubs application to Railway.app.
+This guide walks you through deploying the Spark Clubs application to Railway.app.
 
 ## Overview
 
 Your application will be deployed as two separate services on Railway:
-1. **Backend** (Django API)
+1. **Backend** (Django REST API)
 2. **Frontend** (React app)
 
 Plus a MySQL database that Railway will provision automatically.
+
+## Application Features
+
+Spark Clubs is a discussion group management platform that supports:
+- **Topics**: Members propose discussion topics with title, author/source, and tags
+- **Interest Tracking**: Members can mark themselves as interested, able to lead, or not interested in topics
+- **Multi-Topic Events**: Events can be associated with multiple discussion topics
+- **Role-Based Access**: Super admin, site admin, club admin, member, and pending user roles
+- **Club Management**: Public/private clubs with auto-approval settings for topics
 
 ---
 
@@ -32,11 +41,11 @@ Plus a MySQL database that Railway will provision automatically.
 
 ### 2. Deploy the Backend
 
-#### A. Create PostgreSQL Database
+#### A. Create MySQL Database
 
 1. In your Railway project, click "New Service"
-2. Choose "Database" → "PostgreSQL"
-3. Railway will automatically provision the database and create a `DATABASE_URL` variable
+2. Choose "Database" → "MySQL"
+3. Railway will automatically provision the database and create connection variables (`MYSQL_URL`, `DATABASE_URL`)
 
 #### B. Configure Backend Service
 
@@ -77,8 +86,9 @@ GOOGLE_REDIRECT_URI=https://<your-backend-domain>.railway.app/api/auth/google/ca
 
 **Tips:**
 - Generate SECRET_KEY with: `python -c "import secrets; print(secrets.token_urlsafe(50))"`
-- Railway automatically provides `DATABASE_URL` when you add PostgreSQL
+- Railway automatically provides `DATABASE_URL` when you add MySQL
 - Get your backend URL from Railway after first deployment
+- Note: The application uses MySQL, not PostgreSQL
 
 ### 3. Deploy the Frontend
 
@@ -104,13 +114,13 @@ REACT_APP_GOOGLE_CLIENT_ID=<your-google-client-id>
 
 After both services are deployed:
 
-1. Note your frontend URL (e.g., `https://bookclubs-frontend.railway.app`)
+1. Note your frontend URL (e.g., `https://sparkclubs-frontend.railway.app`)
 2. Go back to Backend service settings
 3. Update these environment variables:
    ```bash
-   CORS_ALLOWED_ORIGINS=https://bookclubs-frontend.railway.app
-   CSRF_TRUSTED_ORIGINS=https://bookclubs-frontend.railway.app
-   FRONTEND_URL=https://bookclubs-frontend.railway.app
+   CORS_ALLOWED_ORIGINS=https://sparkclubs-frontend.railway.app
+   CSRF_TRUSTED_ORIGINS=https://sparkclubs-frontend.railway.app
+   FRONTEND_URL=https://sparkclubs-frontend.railway.app
    ```
 4. Redeploy the backend service
 
@@ -122,6 +132,8 @@ Railway will automatically run migrations on deploy (via the Procfile), but you 
 2. Click on "Deployments"
 3. Open the latest deployment
 4. Click "View Logs" to verify migrations ran successfully
+
+**Important:** The transformation migration (0013_transform_to_discussion_clubs.py) must be applied to convert from books to topics.
 
 Or use Railway CLI:
 ```bash
@@ -137,6 +149,31 @@ railway run python manage.py createsuperuser
 ```
 
 Or use the Railway dashboard terminal.
+
+### 7. Load Test Data (Optional)
+
+To populate the database with sample clubs, topics, and events for testing:
+
+```bash
+railway run python manage.py load_test_data
+```
+
+This will create sample discussion clubs with topics, events, and member interests.
+
+### 8. Management Commands
+
+The application includes helpful management commands:
+
+```bash
+# Load sample data for testing
+railway run python manage.py load_test_data
+
+# Erase all clubs and topics (use with caution!)
+railway run python manage.py erase_clubs_and_books
+
+# Create superuser for admin access
+railway run python manage.py createsuperuser
+```
 
 ---
 
@@ -175,13 +212,20 @@ Or use the Railway dashboard terminal.
 - Check `DATABASE_URL` is properly configured
 
 **Database Connection Error:**
-- Ensure PostgreSQL service is running
+- Ensure MySQL service is running
 - Verify `DATABASE_URL` is automatically linked
 - Check if migrations ran successfully
+- Verify MySQL 8.0+ is being used (required for charset and collation settings)
 
 **Static Files Not Loading:**
 - Verify `python manage.py collectstatic` ran during build
 - Check whitenoise is installed and configured
+
+**Migration Issues:**
+- If deploying to an existing database with old book-based schema, ensure migration 0013_transform_to_discussion_clubs.py runs successfully
+- This migration transforms Book → Topic, BookInterest → TopicInterest, and removes UserBookList
+- Check logs for migration errors: `railway logs --service backend`
+- Manually run migrations if needed: `railway run python manage.py migrate`
 
 ### Frontend Issues
 
@@ -210,7 +254,7 @@ Or use the Railway dashboard terminal.
 
 - Backend: Railway Dashboard → Backend Service → Deployments → View Logs
 - Frontend: Railway Dashboard → Frontend Service → Deployments → View Logs
-- Database: Railway Dashboard → PostgreSQL → Logs
+- Database: Railway Dashboard → MySQL → Logs
 
 ### Metrics
 
@@ -240,7 +284,7 @@ Railway automatically scales your application. For more control:
 |----------|----------|-------------|---------|
 | `SECRET_KEY` | Yes | Django secret key | `django-insecure-xyz...` |
 | `DEBUG` | Yes | Debug mode | `False` |
-| `DATABASE_URL` | Yes (auto) | PostgreSQL connection | Auto-provided by Railway |
+| `DATABASE_URL` | Yes (auto) | MySQL connection | Auto-provided by Railway |
 | `ALLOWED_HOSTS` | Yes | Allowed hostnames | `api.railway.app` |
 | `CORS_ALLOWED_ORIGINS` | Yes | Frontend URLs | `https://frontend.railway.app` |
 | `CSRF_TRUSTED_ORIGINS` | Yes | Trusted origins | `https://frontend.railway.app` |
