@@ -88,7 +88,7 @@ class ClubSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'created_by']
     
     def get_member_count(self, obj):
-        return obj.memberships.filter(status='active').count()topic
+        return obj.memberships.filter(status='active').count()
     
     def get_admin_count(self, obj):
         return obj.memberships.filter(status='active', is_admin=True).count()
