@@ -183,16 +183,6 @@ function ClubDetail() {
     }
   };
 
-  const handleEditTopic = (topic) => {
-    setEditingTopicId(topic.id);
-    setTopicFormData({
-      title: topic.title,
-      author: topic.author,
-      tabs: topic.tabs || '',
-    });
-    setShowTopicForm(true);
-  };
-
   const handleCancelTopicForm = () => {
     setShowTopicForm(false);
     setEditingTopicId(null);
