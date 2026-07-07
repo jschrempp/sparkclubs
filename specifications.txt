@@ -1,0 +1,504 @@
+================================================================================
+SPARK CLUB MANAGEMENT APPLICATION - TECHNICAL SPECIFICATION
+================================================================================
+Version: 1.1
+Last Updated: July 6, 2026
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+A web-based application for managing multiple discussion groups, called Spark Groups, with features for
+member management, topic tracking, event scheduling, and role-based access
+control. The application supports multiple clubs, each with their own members,
+topics, and events.
+
+================================================================================
+2. TECHNICAL STACK
+================================================================================
+
+Database:
+- MySQL 8.0 or higher
+- UTF-8 character encoding
+- InnoDB storage engine for transactional support
+
+Backend:
+- Python/Django
+- RESTful API architecture
+- JWT or session-based authentication
+
+Frontend:
+- React
+- Responsive design (mobile-first approach)
+- Modern browser support (Chrome, Firefox, Safari, Edge - last 2 versions)
+
+Authentication:
+- Local database authentication
+
+Hosting:
+- SSL/HTTPS required for all traffic
+- [Hosting platform to be determined]
+
+================================================================================
+3. USER ROLES & PERMISSION LEVELS
+================================================================================
+
+There are four types of users: super admin, site admin, member, and pending.
+
+3.1 PENDING USER
+   - Default status for new account requests
+   - Limited or no access until promoted by admin
+   - Can view own profile information
+   - Can edit or delete own profile
+
+3.2 MEMBER
+   - Active member with club access
+   - Can belong to multiple clubs
+   - Can participate in club activities
+   - Can ask to join any Public club
+   - Can generate a URL to invite another person to the club
+
+3.3 CLUB ADMIN
+   - Member of a club
+   - Administrator of the club
+   - Can approve members of the club
+   - Can remove members of the club
+   - Can approve topics of the club
+   - Can schedule events of the club
+
+3.3 SITE ADMIN
+   - Manages users and clubs across the entire site
+   - Acts as club admin for all clubs
+   - Cannot modify super admin accounts
+
+3.4 SUPER ADMIN
+   - Highest privilege level
+   - Can perform all site admin functions
+   - Can promote/demote super admin status
+   - Cannot change their own user type (requires another super admin)
+
+IMPORTANT: System must have at least one super admin at all times.
+
+================================================================================
+4. AUTHENTICATION & USER REGISTRATION
+================================================================================
+
+4.1 REGISTRATION FLOW
+   1. Home page displays "Request an Account" button
+   2. User clicks button and is redirected to create an account
+   3. User provides:
+      - First name (required)
+      - Last name (required)
+      - Email address (required)
+      - Zip code (required, 5-digit US format)
+      - Bio (optional, max 500 characters, one paragraph)
+   4. System validates unique email address
+   5. User account created with "pending" status
+
+4.2 EMAIL UNIQUENESS
+   - No two users can share the same email address
+   - System validates on registration and profile updates
+   - Case-insensitive comparison
+
+================================================================================
+5. DATA MODELS
+================================================================================
+
+5.1 USER
+   - id (primary key)
+   - email (unique, indexed)
+   - first_name
+   - last_name
+   - zip_code
+   - bio (text, nullable)
+   - user_type (enum: inactive, pending, member, site_admin, super_admin)
+   - hashed_password
+   - created_at (timestamp)
+   - updated_at (timestamp)
+   - last_login (timestamp)
+
+5.2 CLUB
+   - id (primary key)
+   - name (unique, required)
+   - description (text, short description)
+   - zip_code (5-digit)
+   - status (enum: public, private)
+   - created_at (timestamp)
+   - created_by (foreign key to user)
+   - is_active (boolean, default true)
+
+5.3 CLUB_MEMBERSHIP
+   - id (primary key)
+   - club_id (foreign key)
+   - user_id (foreign key)
+   - status (enum: pending, active, removed)
+   - is_admin (boolean, indicates club admin)
+   - host_order (integer, nullable, for host rotation)
+   - joined_at (timestamp)
+   - updated_at (timestamp)
+   - created_by (foreign key to user)
+   - Unique constraint on (club_id, user_id)
+
+5.4 TOPIC
+   - id (primary key)
+   - club_id (foreign key)
+   - title (required)
+   - author (required)
+   - tabs (varchar 128)
+   - status (enum: pending, active, inactive, hidden)
+   - created_by (foreign key to user)
+   - created_at (timestamp)
+   - updated_at (timestamp)
+   - Unique constraint on (club_id, title) - case insensitive
+
+5.5 TOPIC_INTEREST
+   - id (primary key)
+   - topic_id (foreign key)
+   - user_id (foreign key)
+   - interest_type (enum: interested, able_to_lead, not_interested, unspecified)
+   - created_at (timestamp)
+   - Unique constraint on (topic_id, user_id, interest_type)
+
+5.6 EVENT
+   - id (primary key)
+   - club_id (foreign key)
+   - topic_id (foreign key, nullable for non-book events)
+   - title (required)
+   - start_datetime (datetime, required)
+   - end_datetime (datetime, required)
+   - location (text, required)
+   - host_id (foreign key to user)
+   - status (enum: pending, active, inactive, cancelled)
+   - created_by (foreign key to user)
+   - created_at (timestamp)
+   - updated_at (timestamp)
+
+5.7 EVENT_ATTENDANCE
+   - id (primary key)
+   - event_id (foreign key)
+   - user_id (foreign key)
+   - rsvp_status (enum: attending, maybe, not_attending)
+   - created_at (timestamp)
+   - Unique constraint on (event_id, user_id)
+
+5.7 EVENT_TOPICS
+   - id (primary key)
+   - event_id (foreign key)
+   - topic_id (foreign key)
+   - created_at (timestamp)
+   - Unique constraint on (event_id, topic_id)
+
+================================================================================
+6. FEATURES BY USER TYPE
+================================================================================
+
+6.1 SUPER ADMIN PERMISSIONS
+   All site admin permissions, PLUS:
+   - Promote any user to super admin
+   - Demote any super admin to site admin (except themselves)
+   - Change user_type (member -> site_admin)
+   - View system-wide analytics and reports
+   - Access audit logs
+
+6.2 SITE ADMIN PERMISSIONS
+   All member permissions, PLUS:
+   - View list of all users across all clubs
+   - Change user type (pending -> member, member -> inactive, inactive -> pending )
+   - Cannot modify super admin users
+   - Cannot change own user type
+   - Change club type (pending -> active, active -> pending, private -> public, public -> private)
+   - Promote club members to club admin
+   - Edit club information (name, description, zip code)
+   - Deactivate/reactivate clubs
+   - Act as club admin for ALL clubs
+
+6.3 CLUB ADMIN PERMISSIONS (per club)
+   All member permissions for their club, PLUS:
+   - View all club members (including pending)
+   - Assign users to clubs (create club membership)
+   - Approve pending members (change status to active)
+   - Remove members from club (status -> removed)
+   - Add members to host rotation list
+   - Change order of hosts in rotation
+   - Change status of any topic (pending -> active, etc.)
+   - View detailed topic interest (names of interested/leading/not interested/unspecified)
+   - Create events (initial status: pending)
+   - Edit event details (title, time, location, host, topic list)
+   - Change event status (pending -> active -> inactive/cancelled)
+   - Remove members from events
+   - View all event attendees
+
+6.4 MEMBER PERMISSIONS
+   - View own profile, edit bio and zip code, change password
+   - Browse list of all public clubs (with search/filter)
+   - Create new book clubs (with Pending status)
+   - Request to join a public club (creates pending membership)
+   - Leave any club they belong to
+   - Belong to multiple clubs simultaneously
+   - View their personal list of topics
+   - Delete and add to their personal list of topics
+   
+   Within clubs they're an active member of:
+   - View list of club members (active only) and club admins
+   - View member profiles (name, bio, if member opts in)
+   - View topics with status: active, inactive (not pending or hidden)
+   - View topic details (title, tags, description)
+   - View aggregate counts (how many interested/leading/not interested/unspecified)
+   - Create new topics (initial status: pending)
+   - Mark themselves as interested/leading/not interested/unspecified for any topic
+   - Remove themselves from interested/leading/not interested/unspecified list of any topic
+   - Sort topic list by any field (title, tags, status, created date)
+   - Search topics by title or tags
+   - View active events
+   - RSVP to future events (add/remove themselves)
+   - View event details (topics, time, location, host, attendance count)
+   - Generate a URL to send to someone to invite them to join the club (may require the person to create a user)
+
+6.5 PENDING USER PERMISSIONS
+   - View own profile
+   - Edit profile information
+   - Wait for approval from admin
+   - Delete own profile
+
+================================================================================
+7. BUSINESS RULES & EDGE CASES
+================================================================================
+
+7.1 USER MANAGEMENT
+   - System must maintain at least one super admin at all times
+   - Users cannot change their own user type
+   - Removed club members retain topics they created in that club
+   - User deletion should be soft delete (retain for audit trail)
+   - Email addresses are case-insensitive and trimmed
+
+7.2 CLUB MANAGEMENT
+   - Each club must have at least one club admin
+   - Club names must be unique across the site
+   - Zip codes used for suggesting nearby clubs to users
+   - Host rotation is optional; clubs can manage manually
+   - Inactive clubs are hidden from browse list but data retained
+   - Newly created clubs are private until a site admin or club admin changes them to public
+
+7.3 TOPIC MANAGEMENT
+   - Topic titles must be unique within a club (case-insensitive)
+   - Same topic title can exist in different clubs
+   - Topics with pending status only visible to club admins
+   - Hidden topics not visible to members, only admins
+   - Users can have only one interest type for same topic simultaneously
+   - Topic creator remains associated even if removed from club
+
+7.4 EVENT MANAGEMENT
+   - Events can be associated with a set of topics 
+   - Events without topics are not allowed 
+   - Only future events can be RSVP'd to
+   - Past events are read-only (for history)
+   - Super admins can delete a past event
+   - Host must be an active member of the club
+   - Event times validated (end must be after start)
+   - Cancelled events remain visible but cannot be RSVP'd to
+
+7.5 HOST ROTATION
+   - Host order is a number (1, 2, 3, etc.)
+   - Multiple members can have same order (ties handled by admin)
+   - Not all members need to be in rotation
+   - System can suggest next host based on rotation
+
+================================================================================
+8. ADDITIONAL FEATURES & ENHANCEMENTS
+================================================================================
+
+8.1 SEARCH & DISCOVERY
+   - Search clubs by name, description, zip code proximity
+   - Search topics by title, tags within a club
+   - Filter topics by status, interest level
+   - Advanced filters for clubs (by activity, member count, location)
+
+8.2 NOTIFICATIONS (Email/In-App)
+   - Welcome email on account creation
+   - Notification to admins when new account requested
+   - Notification when approved to join club
+   - Reminder emails for upcoming events (configurable)
+   - Notification when event details change
+   - Notification when new topic added to club
+   - Digest emails of club activity (weekly, configurable per user)
+
+8.3 DASHBOARD & ANALYTICS
+   - Member dashboard: upcoming events, recent topics, clubs
+   - Club dashboard: member count, active topics, upcoming events
+   - Admin analytics: club growth, user engagement, popular topics
+   - Topic statistics: topics completed, events attended
+
+8.4 SOCIAL FEATURES
+   - Topic ratings and reviews (optional, by members)
+   - Discussion threads per topic (forum-style)
+   - Member recommendations ("You might like this topic")
+   - Share club achievements (X topics discussed this year)
+
+8.5 CALENDAR INTEGRATION
+   - Export events to Google Calendar, iCal
+   - Calendar view of all events across clubs
+   - Filter calendar by club or book
+
+8.6 MOBILE FEATURES
+   - Responsive design for all screen sizes
+   - Quick RSVP from mobile
+   - Push notifications (if mobile app developed later)
+
+8.7 PRIVACY & SETTINGS
+   - Profile visibility settings (public/members-only/private)
+   - Email notification preferences
+   - Option to hide email from other members
+   - Data export (GDPR compliance)
+
+8.8 REPORTING
+   - Export member lists to CSV
+   - Export topic lists with interest data
+   - Generate event attendance reports
+   - Club activity reports
+
+8.9 HOST ROTATION AUTOMATION
+   - Auto-suggest next host based on rotation order
+   - Track hosting history
+   - Balance hosting duties (show who's hosted least recently)
+
+================================================================================
+9. NON-FUNCTIONAL REQUIREMENTS
+================================================================================
+
+9.1 PERFORMANCE
+   - Page load time: < 2 seconds on standard broadband
+   - API response time: < 500ms for 95th percentile
+   - Support 100 concurrent users minimum
+   - Database queries optimized with proper indexing
+
+9.2 SECURITY
+   - All traffic over HTTPS/TLS 1.2+
+   - OAuth 2.0 for authentication
+   - Session timeout after 2 hours of inactivity
+   - CSRF protection on all forms
+   - SQL injection prevention (parameterized queries)
+   - XSS protection (input sanitization and output encoding)
+   - Rate limiting on API endpoints
+   - Audit logging for admin actions
+   - Regular security updates and patches
+
+9.3 SCALABILITY
+   - Database design supports 10,000+ users
+   - Horizontal scaling capability
+   - CDN for static assets
+   - Caching strategy (Redis/Memcached)
+
+9.4 RELIABILITY
+   - 99.5% uptime SLA
+   - Automated database backups (daily)
+   - Point-in-time recovery capability
+   - Error logging and monitoring
+   - Graceful error handling with user-friendly messages
+
+9.5 USABILITY
+   - Intuitive navigation
+   - Consistent UI/UX across all pages
+   - Accessibility compliance (WCAG 2.1 Level AA)
+   - Help documentation and tooltips
+   - Mobile-responsive design
+
+9.6 MAINTAINABILITY
+   - Clean, documented code
+   - Comprehensive test coverage (unit, integration, e2e)
+   - Version control (Git)
+   - CI/CD pipeline
+   - Staging environment for testing
+
+9.7 COMPLIANCE
+   - GDPR compliance (for EU users)
+   - Data retention policy documented
+   - Privacy policy and terms of service
+   - Cookie consent management
+
+================================================================================
+10. ACCESS CONTROL MATRIX
+================================================================================
+
+Action                          | Pending | Member | Club Admin | Site Admin | Super Admin
+---------------------------------------------------------------------------
+View own profile                |    ✓    |   ✓    |     ✓      |     ✓      |      ✓
+Edit own profile                |    ✓    |   ✓    |     ✓      |     ✓      |      ✓
+Browse clubs                    |    -    |   ✓    |     ✓      |     ✓      |      ✓
+Request to join club            |    -    |   ✓    |     ✓      |     ✓      |      ✓
+Leave club                      |    -    |   ✓    |     ✓      |     ✓      |      ✓
+View club members               |    -    |   ✓*   |     ✓      |     ✓      |      ✓
+View club topics                |    -    |   ✓*   |     ✓      |     ✓      |      ✓
+Create topic                    |    -    |   ✓*   |     ✓      |     ✓      |      ✓
+Mark topic interest             |    -    |   ✓*   |     ✓      |     ✓      |      ✓
+View events                     |    -    |   ✓*   |     ✓      |     ✓      |      ✓
+RSVP to events                  |    -    |   ✓*   |     ✓      |     ✓      |      ✓
+Approve members                 |    -    |   -    |     ✓**    |     ✓      |      ✓
+Remove members                  |    -    |   -    |     ✓**    |     ✓      |      ✓
+Change topic status             |    -    |   -    |     ✓**    |     ✓      |      ✓
+Create events                   |    -    |   -    |     ✓**    |     ✓      |      ✓
+Edit events                     |    -    |   -    |     ✓**    |     ✓      |      ✓
+Manage host rotation            |    -    |   -    |     ✓**    |     ✓      |      ✓
+Create clubs                    |    -    |   ✓    |     ✓      |     ✓      |      ✓
+Assign users to clubs           |    -    |   -    |     -      |     ✓      |      ✓
+Promote club admins             |    -    |   -    |     -      |     ✓      |      ✓
+View all users                  |    -    |   -    |     -      |     ✓      |      ✓
+Change user types               |    -    |   -    |     -      |     ✓***   |      ✓
+Promote super admins            |    -    |   -    |     -      |     -      |      ✓
+Demote super admins             |    -    |   -    |     -      |     -      |      ✓
+
+* Only within clubs they are active members of
+** Only within clubs they are admins of
+*** Cannot modify super admins or self
+
+================================================================================
+11. DELIVERABLES
+================================================================================
+
+11.1 APPLICATION CODE
+   - Fully functional web application
+   - Source code with version control
+   - Database schema and migration scripts
+   - Configuration files (sanitized, no secrets)
+
+11.2 DOCUMENTATION
+   - README.md with:
+     * Installation instructions
+     * Environment setup
+     * Database configuration
+     * Running the application
+     * Testing procedures
+     * Deployment guide
+     * Full text of this specification
+   - API documentation (if applicable)
+   - Database schema documentation
+   - User manual or help documentation
+
+11.3 TESTING
+   - Unit tests for core functionality
+   - Integration tests for user workflows
+   - Test data seeding scripts
+   - Testing documentation
+
+11.4 DEPLOYMENT
+   - Deployment scripts or Docker configuration
+   - Environment configuration templates
+   - SSL certificate setup instructions
+   - Backup and recovery procedures
+
+================================================================================
+12. FUTURE CONSIDERATIONS
+================================================================================
+
+- Mobile native apps (iOS/Android)
+- Real-time chat for club members
+- Video conferencing integration
+- Topic recommendation algorithm (ML-based)
+- Multi-language support (i18n)
+- Gamification (badges, achievements)
+- Topic club templates (starter packs)
+- Public club directory (opt-in)
+- Donation/payment processing (for club dues)
+
+================================================================================
+END OF SPECIFICATION
+================================================================================

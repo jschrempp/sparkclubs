@@ -1,0 +1,70 @@
+Write a web based application for managing a set of discussion groups called "Spark Clubs". The 
+application will use MySQL to store the data.
+
+The home page will have a button "request an account". When clicked 
+the user will be prompted to log. If 
+successful the user will be asked to supply first name, last name, 
+email address, zip code, and an optional one paragraph bio. The system 
+will not allow two users to have the same email address. A user will be 
+created that is in "pending" status.
+
+There are four typers of users: super admin, site admin, member, pending. When users 
+are created they are type pending.
+
+A super admin can do anything the other member types can do. In addition,
+a super admin can change the type of a user to super admin. A super admin can
+change the user type of another user so that they are not a super admin. A super
+admin cannot change the type of their own user.
+
+A site admin user can see a list of all users. A site admin can change a 
+user from one type to another. A site admin cannot change any attributes of
+a super admin. A site admin can not change their own user 
+type. A site admin can change any information of any other user. A site 
+admin can create a new Spark club. A site admin can assign a user to a Spark 
+club. A site admin can make a member of a Spark club a Spark club admin for 
+that Spark club. 
+
+A club has a name, a short description, a zip code. A club can have one or 
+more club admins. A club has members. Club members can be active or pending 
+or removed. A club has Topics. A club has an ordered list of hosts. A club 
+can have one or more events.
+
+A Topic has a title, a 16 
+character free text field called tags, a date created, the member who 
+created it, status, a list of club members who are interested in the Topic, 
+a list of club members who are willing to lead a discussion of the Topic, a list of club members who are not interested in the topic. The Topic status can be one of: pending, 
+active, inactive, hidden.
+
+An event has a list of Topics, a start date/time, an end date/time, a location, 
+a host, and a list of members attending. An event can have a status of 
+pending, active, or inactive.
+
+A club admin can see the names of all the members of their club. A club 
+member can change the status of a club member from pending to active. A 
+club admin can remove a member from the club. If a member is removed from 
+a club, the Topics they have created remain in the club. A club admin can 
+add a club member to the list of club hosts. A club admin can change the 
+order of the club hosts. A club admin can change the status of any Topic 
+in the club. For each Topic a club admin can see the names of the members who have set
+a status for the Topic. A club admin can 
+see a list of club events. A club admin can create a new event with pending 
+status. A club admin can change the status of any event. A site admin is a 
+club admin of every club.
+
+A club member can see the names of other members of the club and who are the 
+club admins. A club member can see all Topics in the club with a status of 
+active or inactive. For each Topic a member can see a count of the members 
+who have set a status for the Topic. A club member can 
+create a Topic in that club. A new Topic has a status of pending. Each Topic 
+title in the club must be unique. For each Topic a club member can set their status. A club 
+member can sort the Topic list on any field. A club member can remove themselves 
+from any club. A member can belong to more than one club. A club member can see 
+a list of public clubs and ask to be added to that club. A club member can see a list 
+of active events. A club member can add or remove themselves from any event 
+that has a start date/time in the future. 
+
+In addition to these specified features, add any features you think might be 
+useful to our users.
+
+Be sure to create a readme file with installation and high level operational 
+instructions. Be sure to include the full text of this prompt in that file.
