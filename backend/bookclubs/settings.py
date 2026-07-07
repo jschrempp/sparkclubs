@@ -96,13 +96,19 @@ WSGI_APPLICATION = 'bookclubs.wsgi.application'
 DATABASE_URL = env('DATABASE_URL', default=None)
 
 if DATABASE_URL:
-    # Production: Use PostgreSQL via DATABASE_URL
+    # Production: Use MySQL via DATABASE_URL from Railway
     DATABASES = {
-        'default': dj_database_url.config(
-            default=DATABASE_URL,
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            engine='django.db.backends.mysql',
             conn_max_age=600,
             conn_health_checks=True,
         )
+    }
+    # Ensure MySQL options are set
+    DATABASES['default']['OPTIONS'] = {
+        'charset': 'utf8mb4',
+        'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
     }
 else:
     # Development: Use MySQL
