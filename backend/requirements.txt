@@ -8,10 +8,9 @@ google-auth-httplib2==0.2.0
 python-dotenv==1.0.0
 django-environ==0.11.2
 openai>=1.0.0
-# mysqlclient==2.2.1  # Only needed for local MySQL development
+mysqlclient==2.2.1
 
 # Production dependencies
 gunicorn==21.2.0
 whitenoise==6.6.0
-psycopg[binary]>=3.2.0
 dj-database-url==2.1.0
