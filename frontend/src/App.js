@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Clubs from './pages/Clubs';
@@ -28,6 +29,10 @@ function AppRoutes() {
     <>
       {isAuthenticated && <Header />}
       <Routes>
+        <Route 
+          path="/" 
+          element={isAuthenticated ? <Navigate to="/dashboard" /> : <Landing />} 
+        />
         <Route 
           path="/login" 
           element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} 
@@ -70,7 +75,7 @@ function AppRoutes() {
         />
         <Route 
           path="*" 
-          element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} 
+          element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} 
         />
       </Routes>
       {isAuthenticated && <Footer />}
