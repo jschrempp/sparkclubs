@@ -1,3 +1,3 @@
 [phases.setup]
 nixPkgs = ["python310"]
-aptPkgs = ["pkg-config", "default-libmysqlclient-dev", "build-essential"]
+aptPkgs = ["pkg-config", "default-libmysqlclient-dev", "build-essential", "libmysqlclient21"]
