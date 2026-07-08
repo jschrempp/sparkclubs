@@ -68,6 +68,10 @@ function AppRoutes() {
           path="/about" 
           element={<About />} 
         />
+        <Route 
+          path="*" 
+          element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} 
+        />
       </Routes>
       {isAuthenticated && <Footer />}
     </>
