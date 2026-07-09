@@ -15,8 +15,19 @@ function About() {
             data; it might disappear WITHOUT WARNING!
         </p>
 
+        <p> UPDATE: The application began as a bookclub app, described below. It was fun, but there are 
+            alternatives. My friends talked about starting an AI discussion group and were wondering how
+            to pick topics. I realized that this is the same problem as the bookclubs, but with discussion
+            topics instead of books! A few iterations later and CoPilot had changed it to be what it is now.
+
+            I also used CoPilot to help me deploy this app into the Railway.com cloud service. That was a bit
+            frustrating as CoPilot could not figure out why it was not working. After having to double my 
+            tokens CoPilot finally discovered that Railway required the use of a specific MySQL access 
+            library. Then it worked. I had almost given up.
+        </p>
+
         <p>
-            Two weeks ago I decided to build this web application without ANY coding. Everything 
+            March 2026: Two weeks ago I decided to build this web application without ANY coding. Everything 
             <b>you see here, from the frontend to the backend, was created using no-code/low-code tools. </b>
             I used CoPilot Claude Sonet 4.5 to do the work. I started with a specification, about
             a page long. I asked CoPilot to improve the specification, adding any features it thought
