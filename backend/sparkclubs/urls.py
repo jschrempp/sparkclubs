@@ -1,5 +1,5 @@
 """
-URL configuration for bookclubs project.
+URL configuration for sparkclubs project.
 """
 from django.contrib import admin
 from django.urls import path, include

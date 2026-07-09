@@ -1,5 +1,5 @@
 """
-Django settings for bookclubs project.
+Django settings for sparkclubs project.
 """
 
 import os
@@ -71,7 +71,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'bookclubs.urls'
+ROOT_URLCONF = 'sparkclubs.urls'
 
 TEMPLATES = [
     {
@@ -89,7 +89,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'bookclubs.wsgi.application'
+WSGI_APPLICATION = 'sparkclubs.wsgi.application'
 
 # Database
 # Use DATABASE_URL if available (Railway provides this), otherwise use MySQL config
@@ -115,7 +115,7 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
-            'NAME': env('DB_NAME', default='bookclubs_db'),
+            'NAME': env('DB_NAME', default='sparkclubs_db'),
             'USER': env('DB_USER', default='root'),
             'PASSWORD': env('DB_PASSWORD', default=''),
             'HOST': env('DB_HOST', default='localhost'),

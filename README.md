@@ -82,7 +82,7 @@ A modern web-based platform for managing discussion groups with features for mem
 
 4. **Configure database**
    - Create a MySQL database
-   - Update `backend/bookclubs/settings.py` with your database credentials
+   - Update `backend/sparkclubs/settings.py` with your database credentials
    ```python
    DATABASES = {
        'default': {

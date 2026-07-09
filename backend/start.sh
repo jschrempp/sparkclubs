@@ -9,4 +9,4 @@ python manage.py migrate --no-input
 python manage.py create_default_superadmin
 
 # Start gunicorn
-exec gunicorn bookclubs.wsgi --bind 0.0.0.0:$PORT
+exec gunicorn sparkclubs.wsgi --bind 0.0.0.0:$PORT
