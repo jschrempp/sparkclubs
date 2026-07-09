@@ -27,9 +27,11 @@ class Migration(migrations.Migration):
             """
             DELETE FROM book_interests
             WHERE id NOT IN (
-                SELECT MAX(id)
-                FROM book_interests
-                GROUP BY book_id, user_id
+                SELECT id FROM (
+                    SELECT MAX(id) AS id
+                    FROM book_interests
+                    GROUP BY book_id, user_id
+                ) AS tmp
             );
             """,
             reverse_sql=migrations.RunSQL.noop,
