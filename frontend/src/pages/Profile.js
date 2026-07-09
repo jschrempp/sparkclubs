@@ -108,8 +108,6 @@ function Profile() {
               />
               {eyeBtn('new_pw')}
             </div>
-              required
-            />
             {form.new_password && (
               <ul style={{ marginTop: 6, paddingLeft: 18, fontSize: 13 }}>
                 {passwordRequirements.map((r) => (

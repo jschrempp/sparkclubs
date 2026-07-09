@@ -238,7 +238,7 @@ def my_events(request):
     attendances = EventAttendance.objects.filter(
         user=request.user,
         rsvp_status='attending'
-    ).select_related('event', 'event__club', 'event__book', 'event__host')
+    ).select_related('event', 'event__club', 'event__host')
     
     # Extract events and filter to future events only (optional)
     events = [attendance.event for attendance in attendances]
