@@ -13,7 +13,7 @@ Plus a MySQL database that Railway will provision automatically.
 ## Application Features
 
 Spark Clubs is a discussion group management platform that supports:
-- **Topics**: Members propose discussion topics with title, author/source, and tags
+- **Topics**: Members propose discussion topics with title, description, and tags
 - **Interest Tracking**: Members can mark themselves as interested, able to lead, or not interested in topics
 - **Multi-Topic Events**: Events can be associated with multiple discussion topics
 - **Role-Based Access**: Super admin, site admin, club admin, member, and pending user roles
@@ -150,24 +150,11 @@ railway run python manage.py createsuperuser
 
 Or use the Railway dashboard terminal.
 
-### 7. Load Test Data (Optional)
-
-To populate the database with sample clubs, topics, and events for testing:
-
-```bash
-railway run python manage.py load_test_data
-```
-
-This will create sample discussion clubs with topics, events, and member interests.
-
-### 8. Management Commands
+### 7. Management Commands
 
 The application includes helpful management commands:
 
 ```bash
-# Load sample data for testing
-railway run python manage.py load_test_data
-
 # Erase all clubs and topics (use with caution!)
 railway run python manage.py erase_clubs_and_books
 

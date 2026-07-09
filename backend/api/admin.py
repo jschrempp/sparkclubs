@@ -53,9 +53,9 @@ class ClubMembershipAdmin(admin.ModelAdmin):
 
 @admin.register(Topic)
 class TopicAdmin(admin.ModelAdmin):
-    list_display = ('title', 'author', 'club', 'status', 'tabs', 'created_at')
+    list_display = ('title', 'description', 'club', 'status', 'tabs', 'created_at')
     list_filter = ('status', 'created_at')
-    search_fields = ('title', 'author', 'tabs')
+    search_fields = ('title', 'description', 'tabs')
     ordering = ('-created_at',)
 
 @admin.register(TopicInterest)

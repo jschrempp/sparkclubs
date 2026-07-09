@@ -142,7 +142,7 @@ class Topic(models.Model):
     
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='topics')
     title = models.CharField(max_length=500)
-    author = models.CharField(max_length=200)
+    description = models.CharField(max_length=200)
     tabs = models.CharField(max_length=128, blank=True, null=True, help_text='Tags for categorizing topics')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_topics')
@@ -156,11 +156,11 @@ class Topic(models.Model):
         indexes = [
             models.Index(fields=['club', 'status']),
             models.Index(fields=['title']),
-            models.Index(fields=['author']),
+            models.Index(fields=['description']),
         ]
     
     def __str__(self):
-        return f"{self.title} by {self.author}"
+        return f"{self.title} - {self.description}"
 
 
 class TopicInterest(models.Model):

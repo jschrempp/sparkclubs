@@ -45,7 +45,7 @@ A modern web-based platform for managing discussion groups with features for mem
 - **User**: Email-based authentication with user types (pending, member, site_admin, super_admin)
 - **Club**: Discussion groups with visibility controls and auto-approval settings
 - **ClubMembership**: Join relationship between users and clubs with admin flags
-- **Topic**: Discussion topics with title, author, tags, and status
+- **Topic**: Discussion topics with title, description, tags, and status
 - **TopicInterest**: Track member interest levels (interested, able_to_lead, not_interested, unspecified)
 - **Event**: Scheduled club meetings with multiple associated topics
 - **EventTopic**: Many-to-many relationship between events and topics
@@ -249,12 +249,6 @@ Topics support four interest levels:
 - `PATCH /api/system-settings/update/` - Update settings
 
 ## 🛠️ Management Commands
-
-### Load Test Data
-```bash
-python manage.py load_test_data
-```
-Creates sample users, clubs, topics, and events for testing.
 
 ### Erase Clubs and Topics
 ```bash

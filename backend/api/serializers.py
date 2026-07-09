@@ -136,7 +136,7 @@ class TopicSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Topic
-        fields = ['id', 'club', 'title', 'author', 'tabs', 
+        fields = ['id', 'club', 'title', 'description', 'tabs', 
                   'status', 'created_by', 'created_by_name', 'created_at', 
                   'updated_at', 'interest_counts', 'user_interest']
         read_only_fields = ['id', 'created_at', 'updated_at', 'created_by']
@@ -214,7 +214,7 @@ class EventSerializer(serializers.ModelSerializer):
             {
                 'id': et.topic.id,
                 'title': et.topic.title,
-                'author': et.topic.author,
+                'description': et.topic.description,
             }
             for et in event_topics
         ]

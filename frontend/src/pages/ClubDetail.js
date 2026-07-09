@@ -21,7 +21,7 @@ function ClubDetail() {
   const [showTopicForm, setShowTopicForm] = useState(false);
   const [topicFormData, setTopicFormData] = useState({
     title: '',
-    author: '',
+    description: '',
     tabs: '',
   });
   const [editingTopicId, setEditingTopicId] = useState(null);
@@ -154,7 +154,7 @@ function ClubDetail() {
 
       setShowTopicForm(false);
       setEditingTopicId(null);
-      setTopicFormData({ title: '', author: '', tabs: '' });
+      setTopicFormData({ title: '', description: '', tabs: '' });
       loadClubData();
     } catch (err) {
       alert(err.message);
@@ -186,7 +186,7 @@ function ClubDetail() {
   const handleCancelTopicForm = () => {
     setShowTopicForm(false);
     setEditingTopicId(null);
-    setTopicFormData({ title: '', author: '', tabs: '' });
+    setTopicFormData({ title: '', description: '', tabs: '' });
   };
 
   const handleCreateOrUpdateEvent = async (e) => {
@@ -424,12 +424,12 @@ function ClubDetail() {
                     />
                   </div>
                   <div className="form-group">
-                    <label>Author/Source *</label>
+                    <label>Description *</label>
                     <input
                       type="text"
                       className="form-control"
-                      value={topicFormData.author}
-                      onChange={(e) => setTopicFormData({...topicFormData, author: e.target.value})}
+                      value={topicFormData.description}
+                      onChange={(e) => setTopicFormData({...topicFormData, description: e.target.value})}
                       required
                     />
                   </div>
@@ -468,7 +468,6 @@ function ClubDetail() {
                 <thead>
                   <tr>
                     <th>Title</th>
-                    <th>Author/Source</th>
                     <th>Tags</th>
                     <th>Added By</th>
                     <th>Status</th>
@@ -482,8 +481,14 @@ function ClubDetail() {
                 <tbody>
                   {topics.map((topic) => (
                     <tr key={topic.id}>
-                      <td>{topic.title}</td>
-                      <td>{topic.author}</td>
+                      <td>
+                        <div>{topic.title}</div>
+                        {topic.description && (
+                          <div style={{ fontSize: '0.85em', color: '#666', fontStyle: 'italic' }}>
+                            {topic.description}
+                          </div>
+                        )}
+                      </td>
                       <td>{topic.tabs || '-'}</td>
                       <td>{topic.created_by_name}</td>
                       <td>
