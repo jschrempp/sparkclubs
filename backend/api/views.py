@@ -27,6 +27,22 @@ from .permissions import IsSuperAdmin, IsSiteAdmin, IsMemberOrAdmin, IsClubAdmin
 from .authentication import generate_jwt_token
 
 
+def _validate_password_strength(password):
+    """Return an error string if password doesn't meet requirements, else None."""
+    import re
+    if len(password) < 8:
+        return 'Password must be at least 8 characters'
+    if not re.search(r'[A-Z]', password):
+        return 'Password must contain at least one uppercase letter'
+    if not re.search(r'[a-z]', password):
+        return 'Password must contain at least one lowercase letter'
+    if not re.search(r'\d', password):
+        return 'Password must contain at least one digit'
+    if not re.search(r'[^A-Za-z0-9]', password):
+        return 'Password must contain at least one special character'
+    return None
+
+
 # Authentication Views
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -142,6 +158,12 @@ def register(request):
                 {'error': 'Password is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        password = serializer.validated_data.get('password')
+        if password:
+            error = _validate_password_strength(password)
+            if error:
+                return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
         
         # Check if auto-approval is enabled
         system_settings = SystemSettings.get_settings()
@@ -166,6 +188,39 @@ def register(request):
 def me(request):
     """Get current user's profile."""
     return Response(UserSerializer(request.user).data)
+
+
+@api_view(['POST'])
+def change_password(request):
+    """Allow authenticated user to change their own password."""
+    current_password = request.data.get('current_password')
+    new_password = request.data.get('new_password')
+
+    if not current_password or not new_password:
+        return Response(
+            {'error': 'current_password and new_password are required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if not request.user.check_password(current_password):
+        return Response(
+            {'error': 'Current password is incorrect'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if len(new_password) < 8:
+        return Response(
+            {'error': 'New password must be at least 8 characters'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    error = _validate_password_strength(new_password)
+    if error:
+        return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+
+    request.user.set_password(new_password)
+    request.user.save()
+    return Response({'message': 'Password changed successfully'})
 
 
 @api_view(['GET'])

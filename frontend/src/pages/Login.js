@@ -21,6 +21,23 @@ function Login() {
     confirmPassword: '',
   });
   const [error, setError] = useState('');
+  const [showPasswords, setShowPasswords] = useState({});
+
+  const toggleShow = (field) =>
+    setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
+
+  const eyeBtn = (field) => (
+    <button
+      type="button"
+      onClick={() => toggleShow(field)}
+      style={{
+        position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+        background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: 13, padding: 0,
+      }}
+    >
+      {showPasswords[field] ? 'Hide' : 'Show'}
+    </button>
+  );
 
   // Google OAuth handlers
   const handleGoogleSuccess = async (credentialResponse) => {
@@ -61,6 +78,16 @@ function Login() {
     }
   };
 
+  // Password requirements (shared between registration and profile change)
+  const passwordRequirements = [
+    { label: 'At least 8 characters', test: (p) => p.length >= 8 },
+    { label: 'One uppercase letter', test: (p) => /[A-Z]/.test(p) },
+    { label: 'One lowercase letter', test: (p) => /[a-z]/.test(p) },
+    { label: 'One digit', test: (p) => /\d/.test(p) },
+    { label: 'One special character', test: (p) => /[^A-Za-z0-9]/.test(p) },
+  ];
+  const passwordValid = (p) => passwordRequirements.every((r) => r.test(p));
+
   // Registration handler
   const handleRegistrationSubmit = async (e) => {
     e.preventDefault();
@@ -72,8 +99,8 @@ function Login() {
       return;
     }
 
-    if (!USE_GOOGLE_OAUTH && formData.password.length < 8) {
-      setError('Password must be at least 8 characters long');
+    if (!USE_GOOGLE_OAUTH && !passwordValid(formData.password)) {
+      setError('Password does not meet the requirements');
       return;
     }
 
@@ -152,27 +179,42 @@ function Login() {
               <>
                 <div className="form-group">
                   <label>Password *</label>
-                  <input
-                    type="password"
-                    name="password"
-                    className="form-control"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    minLength="8"
-                    required
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPasswords.reg_password ? 'text' : 'password'}
+                      name="password"
+                      className="form-control"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      style={{ paddingRight: 55 }}
+                      required
+                    />
+                    {eyeBtn('reg_password')}
+                  </div>
+                  {formData.password && (
+                    <ul style={{ marginTop: 6, paddingLeft: 18, fontSize: 13 }}>
+                      {passwordRequirements.map((r) => (
+                        <li key={r.label} style={{ color: r.test(formData.password) ? '#28a745' : '#dc3545' }}>
+                          {r.label}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Confirm Password *</label>
-                  <input
-                    type="password"
-                    name="confirmPassword"
-                    className="form-control"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    minLength="8"
-                    required
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPasswords.reg_confirm ? 'text' : 'password'}
+                      name="confirmPassword"
+                      className="form-control"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      style={{ paddingRight: 55 }}
+                      required
+                    />
+                    {eyeBtn('reg_confirm')}
+                  </div>
                 </div>
               </>
             )}
@@ -272,14 +314,18 @@ function Login() {
           </div>
           <div className="form-group">
             <label>Password *</label>
-            <input
-              type="password"
-              name="password"
-              className="form-control"
-              value={formData.password}
-              onChange={handleInputChange}
-              required
-            />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPasswords.login ? 'text' : 'password'}
+                name="password"
+                className="form-control"
+                value={formData.password}
+                onChange={handleInputChange}
+                style={{ paddingRight: 55 }}
+                required
+              />
+              {eyeBtn('login')}
+            </div>
           </div>
           {error && <div className="error">{error}</div>}
           <button type="submit" className="btn btn-primary mt-1" style={{ width: '100%' }}>

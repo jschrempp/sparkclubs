@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
+import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import Clubs from './pages/Clubs';
 import ClubDetail from './pages/ClubDetail';
@@ -72,6 +73,14 @@ function AppRoutes() {
         <Route 
           path="/about" 
           element={<About />} 
+        />
+        <Route 
+          path="/profile" 
+          element={
+            <PrivateRoute>
+              <Profile />
+            </PrivateRoute>
+          } 
         />
         <Route 
           path="*" 

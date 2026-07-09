@@ -17,9 +17,9 @@ function Header() {
               <Link to="/admin">Admin</Link>
             ) : null}
             <Link to="/about">About</Link>
-            <div>
+            <Link to="/profile">
               {user.first_name} {user.last_name}
-            </div>
+            </Link>
             <button onClick={logout} className="btn btn-sm btn-secondary">
               Logout
             </button>

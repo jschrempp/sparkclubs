@@ -68,6 +68,15 @@ export const authAPI = {
     return handleResponse(response);
   },
 
+  changePassword: async (currentPassword, newPassword) => {
+    const response = await fetch(`${API_BASE_URL}/auth/change-password/`, {
+      method: 'POST',
+      headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+    return handleResponse(response);
+  },
+
   myMemberships: async () => {
     const response = await fetch(`${API_BASE_URL}/auth/my-memberships/`, {
       headers: getAuthHeader(),
