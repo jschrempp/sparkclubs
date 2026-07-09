@@ -464,7 +464,18 @@ function ClubDetail() {
             {topics.length === 0 ? (
               <p>No topics yet. Add a topic to get started!</p>
             ) : (
-              <table className="table">
+              <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
+                <colgroup>
+                  <col style={{ width: '34%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '9%' }} />
+                  <col style={{ width: '6%' }} />
+                  <col style={{ width: '6%' }} />
+                  <col style={{ width: '6%' }} />
+                  <col style={{ width: '8%' }} />
+                  <col style={{ width: '12%' }} />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Title</th>
@@ -481,7 +492,7 @@ function ClubDetail() {
                 <tbody>
                   {topics.map((topic) => (
                     <tr key={topic.id}>
-                      <td>
+                      <td style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                         <div>{topic.title}</div>
                         {topic.description && (
                           <div style={{ fontSize: '0.85em', color: '#666', fontStyle: 'italic' }}>
@@ -489,13 +500,13 @@ function ClubDetail() {
                           </div>
                         )}
                       </td>
-                      <td>{topic.tabs || '-'}</td>
-                      <td>{topic.created_by_name}</td>
+                      <td style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.tabs || '-'}</td>
+                      <td style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.created_by_name}</td>
                       <td>
                         {isClubAdmin ? (
                           <select
                             className="form-control"
-                            style={{ width: '120px' }}
+                            style={{ width: '100%' }}
                             value={topic.status}
                             onChange={(e) => handleChangeTopicStatus(topic.id, e.target.value)}
                           >
