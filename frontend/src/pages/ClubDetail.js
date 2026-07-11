@@ -496,11 +496,11 @@ function ClubDetail() {
                         </td>
                       </tr>
                       <tr>
-                        <td colSpan={8} style={{ wordWrap: 'break-word', overflowWrap: 'break-word', fontSize: '0.85em', color: '#666', fontStyle: 'italic', borderBottom: 'none' }}>
+                        <td colSpan={8} style={{ wordWrap: 'break-word', overflowWrap: 'break-word', color: '#666', fontStyle: 'italic', borderBottom: 'none' }}>
                           {topic.description}
                         </td>
                       </tr>
-                      <tr>
+                      <tr style={{ fontSize: '0.8em' }}>
                         <td style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.tabs || '-'}</td>
                         <td style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.created_by_name}</td>
                         <td>
