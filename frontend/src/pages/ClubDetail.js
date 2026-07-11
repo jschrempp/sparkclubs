@@ -464,111 +464,93 @@ function ClubDetail() {
             {topics.length === 0 ? (
               <p>No topics yet. Add a topic to get started!</p>
             ) : (
-              <table className="table" style={{ tableLayout: 'fixed', width: '100%' }}>
-                <colgroup>
-                  <col style={{ width: '15%' }} />
-                  <col style={{ width: '15%' }} />
-                  <col style={{ width: '12%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '10%' }} />
-                  <col style={{ width: '12%' }} />
-                  <col style={{ width: '16%' }} />
-                </colgroup>
-                <thead>
-                  <tr>
-                    <th>Tags</th>
-                    <th>Added By</th>
-                    <th>Status</th>
-                    <th>Interested</th>
-                    <th>Can Lead</th>
-                    <th>Not Interested</th>
-                    <th>My Interest</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topics.map((topic) => (
-                    <React.Fragment key={topic.id}>
-                      <tr>
-                        <td colSpan={8} style={{ wordWrap: 'break-word', overflowWrap: 'break-word', fontWeight: 'bold', borderBottom: 'none' }}>
-                          {topic.title}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td colSpan={8} style={{ wordWrap: 'break-word', overflowWrap: 'break-word', color: '#666', fontStyle: 'italic', borderBottom: 'none' }}>
-                          {topic.description}
-                        </td>
-                      </tr>
-                      <tr style={{ fontSize: '0.8em' }}>
-                        <td style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.tabs || '-'}</td>
-                        <td style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.created_by_name}</td>
-                        <td>
-                          {isClubAdmin ? (
-                            <select
-                              className="form-control"
-                              style={{ width: '100%' }}
-                              value={topic.status}
-                              onChange={(e) => handleChangeTopicStatus(topic.id, e.target.value)}
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="active">Active</option>
-                              <option value="inactive">Inactive</option>
-                              <option value="hidden">Hidden</option>
-                            </select>
-                          ) : (
-                            <span className={`badge badge-${topic.status}`}>{topic.status}</span>
-                          )}
-                        </td>
-                        <td>{topic.interest_counts?.interested || 0}</td>
-                        <td>{topic.interest_counts?.able_to_lead || 0}</td>
-                        <td>{topic.interest_counts?.not_interested || 0}</td>
-                        <td>
-                          {topic.user_interest ? (
-                            <span className="badge badge-success">{topic.user_interest}</span>
-                          ) : (
-                            <span className="badge badge-secondary">none</span>
-                          )}
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                            <button
-                              className="btn btn-sm btn-primary"
-                              onClick={() => handleSetInterest(topic.id, 'interested')}
-                              title="I'm interested in this topic"
-                            >
-                              👍
-                            </button>
-                            <button
-                              className="btn btn-sm btn-success"
-                              onClick={() => handleSetInterest(topic.id, 'able_to_lead')}
-                              title="I can lead this discussion"
-                            >
-                              🎤
-                            </button>
-                            <button
-                              className="btn btn-sm btn-warning"
-                              onClick={() => handleSetInterest(topic.id, 'not_interested')}
-                              title="Not interested"
-                            >
-                              👎
-                            </button>
-                            {topic.user_interest && (
-                              <button
-                                className="btn btn-sm btn-secondary"
-                                onClick={() => handleRemoveInterest(topic.id)}
-                                title="Remove my interest"
-                              >
-                                ✖
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
+              <div className="topics-list">
+                {topics.map((topic) => (
+                  <div key={topic.id} className="card mb-2" style={{ padding: '16px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                      {topic.title}
+                    </h4>
+                    {topic.description && (
+                      <p style={{ margin: '0 0 12px 0', color: '#333', wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                        {topic.description}
+                      </p>
+                    )}
+
+                    <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: '8px',
+                      fontSize: '0.8em',
+                      color: '#666',
+                      paddingTop: '8px',
+                      borderTop: '1px solid #eee'
+                    }}>
+                      {topic.tabs && <span>🏷 {topic.tabs}</span>}
+                      <span>👤 {topic.created_by_name}</span>
+
+                      {isClubAdmin ? (
+                        <select
+                          className="form-control"
+                          style={{ width: 'auto', fontSize: 'inherit', padding: '2px 4px' }}
+                          value={topic.status}
+                          onChange={(e) => handleChangeTopicStatus(topic.id, e.target.value)}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                          <option value="hidden">Hidden</option>
+                        </select>
+                      ) : (
+                        <span className={`badge badge-${topic.status}`}>{topic.status}</span>
+                      )}
+
+                      <span>👍 {topic.interest_counts?.interested || 0}</span>
+                      <span>🎤 {topic.interest_counts?.able_to_lead || 0}</span>
+                      <span>👎 {topic.interest_counts?.not_interested || 0}</span>
+
+                      {topic.user_interest ? (
+                        <span className="badge badge-success">My interest: {topic.user_interest}</span>
+                      ) : (
+                        <span className="badge badge-secondary">My interest: none</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '10px' }}>
+                      <button
+                        className="btn btn-sm btn-primary"
+                        onClick={() => handleSetInterest(topic.id, 'interested')}
+                        title="I'm interested in this topic"
+                      >
+                        👍
+                      </button>
+                      <button
+                        className="btn btn-sm btn-success"
+                        onClick={() => handleSetInterest(topic.id, 'able_to_lead')}
+                        title="I can lead this discussion"
+                      >
+                        🎤
+                      </button>
+                      <button
+                        className="btn btn-sm btn-warning"
+                        onClick={() => handleSetInterest(topic.id, 'not_interested')}
+                        title="Not interested"
+                      >
+                        👎
+                      </button>
+                      {topic.user_interest && (
+                        <button
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => handleRemoveInterest(topic.id)}
+                          title="Remove my interest"
+                        >
+                          ✖
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
