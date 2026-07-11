@@ -63,6 +63,10 @@ yarn-error.log*
 /frontend/.pnp
 /frontend/.pnp.js
 
+# Generated at build time - must never be committed, or it can mask
+# real deployments by making generate-version.js reuse a stale value.
+/frontend/src/version.json
+
 # Testing
 /coverage/
 .nyc_output/
