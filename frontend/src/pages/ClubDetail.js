@@ -516,37 +516,26 @@ function ClubDetail() {
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginTop: '10px' }}>
-                      <button
-                        className="btn btn-sm btn-primary"
-                        onClick={() => handleSetInterest(topic.id, 'interested')}
-                        title="I'm interested in this topic"
+                    <div style={{ marginTop: '10px' }}>
+                      <select
+                        className="form-control"
+                        style={{ width: 'auto' }}
+                        value={topic.user_interest || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            handleRemoveInterest(topic.id);
+                          } else {
+                            handleSetInterest(topic.id, value);
+                          }
+                        }}
+                        title="Set my interest in this topic"
                       >
-                        👍
-                      </button>
-                      <button
-                        className="btn btn-sm btn-success"
-                        onClick={() => handleSetInterest(topic.id, 'able_to_lead')}
-                        title="I can lead this discussion"
-                      >
-                        🎤
-                      </button>
-                      <button
-                        className="btn btn-sm btn-warning"
-                        onClick={() => handleSetInterest(topic.id, 'not_interested')}
-                        title="Not interested"
-                      >
-                        👎
-                      </button>
-                      {topic.user_interest && (
-                        <button
-                          className="btn btn-sm btn-secondary"
-                          onClick={() => handleRemoveInterest(topic.id)}
-                          title="Remove my interest"
-                        >
-                          ✖
-                        </button>
-                      )}
+                        <option value="">My interest: none</option>
+                        <option value="interested">👍 Interested</option>
+                        <option value="able_to_lead">🎤 I can lead this discussion</option>
+                        <option value="not_interested">👎 Not interested</option>
+                      </select>
                     </div>
                   </div>
                 ))}
