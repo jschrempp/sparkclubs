@@ -9,6 +9,7 @@ import Profile from './pages/Profile';
 import Dashboard from './pages/Dashboard';
 import Clubs from './pages/Clubs';
 import ClubDetail from './pages/ClubDetail';
+import JoinClub from './pages/JoinClub';
 import Admin from './pages/Admin';
 import About from './pages/About';
 import './index.css';
@@ -37,6 +38,10 @@ function AppRoutes() {
         <Route 
           path="/login" 
           element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} 
+        />
+        <Route 
+          path="/join/:clubId" 
+          element={<JoinClub />} 
         />
         <Route 
           path="/dashboard" 

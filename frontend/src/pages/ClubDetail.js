@@ -13,9 +13,21 @@ function ClubDetail() {
   const [activeTab, setActiveTab] = useState('topics');
   const [loading, setLoading] = useState(true);
   const { user, isSiteAdmin, isSuperAdmin } = useAuth();
-  
+  const [inviteCopied, setInviteCopied] = useState(false);
+
   // Check if user is club admin (site admins are always club admin)
   const isClubAdmin = isSiteAdmin || members.find(m => m.user === user?.id && m.is_admin && m.status === 'active');
+
+  const handleCopyInviteLink = async () => {
+    const inviteUrl = `${window.location.origin}/join/${id}`;
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    } catch (err) {
+      window.prompt('Copy this invite link:', inviteUrl);
+    }
+  };
   
   // Form states
   const [showTopicForm, setShowTopicForm] = useState(false);
@@ -282,6 +294,13 @@ function ClubDetail() {
             <p><strong>Members:</strong> {club.member_count}</p>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={handleCopyInviteLink}
+              title="Copy a link you can share to invite someone to this club"
+            >
+              {inviteCopied ? '✓ Link Copied!' : '🔗 Copy Invite Link'}
+            </button>
             {isClubAdmin && (
               <button 
                 className="btn btn-secondary"

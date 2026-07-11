@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { authAPI } from '../api';
+import { authAPI, clubsAPI } from '../api';
 
 const USE_GOOGLE_OAUTH = process.env.REACT_APP_USE_GOOGLE_OAUTH === 'true';
 
@@ -22,6 +22,34 @@ function Login() {
   });
   const [error, setError] = useState('');
   const [showPasswords, setShowPasswords] = useState({});
+
+  // After a successful login/registration, join any club the user was invited
+  // to via a /join/:clubId link, then send them there instead of the dashboard.
+  const completeAuth = async (token, userData) => {
+    login(token, userData);
+
+    const pendingClubId = localStorage.getItem('pendingClubInvite');
+    if (pendingClubId) {
+      if (userData.user_type === 'pending') {
+        // Site account is still awaiting admin approval - the join request
+        // can't go through yet. Keep the invite queued so it's retried the
+        // next time this user logs in, once their account is approved.
+        navigate('/dashboard');
+        return;
+      }
+
+      try {
+        await clubsAPI.join(pendingClubId);
+      } catch (err) {
+        // Ignore errors here (e.g. already a member) - still take them to the club
+      }
+      localStorage.removeItem('pendingClubInvite');
+      navigate(`/clubs/${pendingClubId}`);
+      return;
+    }
+
+    navigate('/dashboard');
+  };
 
   const toggleShow = (field) =>
     setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
@@ -56,8 +84,7 @@ function Login() {
         }));
         setShowRegistration(true);
       } else {
-        login(result.token, result.user);
-        navigate('/dashboard');
+        await completeAuth(result.token, result.user);
       }
     } catch (err) {
       setError(err.message);
@@ -71,8 +98,7 @@ function Login() {
 
     try {
       const result = await authAPI.login(formData.email, formData.password);
-      login(result.token, result.user);
-      navigate('/dashboard');
+      await completeAuth(result.token, result.user);
     } catch (err) {
       setError(err.message);
     }
@@ -120,8 +146,7 @@ function Login() {
       }
 
       const result = await authAPI.register(registrationData);
-      login(result.token, result.user);
-      navigate('/dashboard');
+      await completeAuth(result.token, result.user);
     } catch (err) {
       setError(err.message);
     }
