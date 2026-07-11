@@ -55,11 +55,11 @@ function Landing() {
         {/* Image Section */}
         <div style={styles.imageSection}>
           <div style={styles.imageGrid}>
-            {/* Image 1 - Placeholder, replace with actual image */}
+            {/* Image 1 - Photo by Damian Santos (Pexels), cozy indoor gathering */}
             <div style={{...styles.imageCard, ...styles.imageCard1}}>
               <img 
-                src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=800&q=80"
-                alt="Diverse group of people discussing topics in a cozy living room"
+                src="https://images.pexels.com/photos/35203995/pexels-photo-35203995.jpeg?auto=compress&cs=tinysrgb&w=800"
+                alt="Diverse group of friends talking and laughing in a cozy living room"
                 style={styles.image}
               />
               <div style={styles.imageOverlay}>
@@ -67,11 +67,11 @@ function Landing() {
               </div>
             </div>
 
-            {/* Image 2 - Placeholder, replace with actual image */}
+            {/* Image 2 - Photo by Ron Lach (Pexels), group in a living room */}
             <div style={{...styles.imageCard, ...styles.imageCard2}}>
               <img 
-                src="https://images.unsplash.com/photo-1509266272358-7701da638078?w=800&q=80"
-                alt="Discussion club members sharing perspectives in a welcoming environment"
+                src="https://images.pexels.com/photos/8275697/pexels-photo-8275697.jpeg?auto=compress&cs=tinysrgb&w=800"
+                alt="Discussion club members sharing perspectives in a welcoming living room"
                 style={styles.image}
               />
               <div style={styles.imageOverlay}>
