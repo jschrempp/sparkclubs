@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.validators import RegexValidator
+import secrets
 
 
 class UserManager(BaseUserManager):
@@ -95,6 +96,12 @@ class Club(models.Model):
     is_active = models.BooleanField(default=True)
     is_public = models.BooleanField(default=True, help_text='Public clubs are visible to all users. Private clubs are only visible to members.')
     auto_approve_topics = models.BooleanField(default=False, help_text='Automatically approve topics when added. When disabled, club admins must manually approve topics.')
+    invite_token = models.CharField(
+        max_length=32,
+        unique=True,
+        blank=True,
+        help_text='Opaque token used in invite links (/join/<token>) instead of the numeric id, so club ids cannot be guessed or enumerated.'
+    )
     
     class Meta:
         db_table = 'clubs'
@@ -102,6 +109,19 @@ class Club(models.Model):
     
     def __str__(self):
         return self.name
+    
+    def save(self, *args, **kwargs):
+        if not self.invite_token:
+            self.invite_token = self._generate_unique_invite_token()
+        super().save(*args, **kwargs)
+    
+    @staticmethod
+    def _generate_unique_invite_token():
+        """Generate a random, unguessable token for invite links."""
+        while True:
+            token = secrets.token_urlsafe(16)
+            if not Club.objects.filter(invite_token=token).exists():
+                return token
 
 
 class ClubMembership(models.Model):

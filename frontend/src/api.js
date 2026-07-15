@@ -214,6 +214,14 @@ export const clubsAPI = {
     return handleResponse(response);
   },
 
+  joinByToken: async (token) => {
+    const response = await fetch(`${API_BASE_URL}/clubs/join-by-token/${token}/`, {
+      method: 'POST',
+      headers: getAuthHeader(),
+    });
+    return handleResponse(response);
+  },
+
   leave: async (id) => {
     const response = await fetch(`${API_BASE_URL}/clubs/${id}/leave/`, {
       method: 'POST',

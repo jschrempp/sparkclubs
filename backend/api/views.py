@@ -7,6 +7,7 @@ from io import StringIO
 from django.conf import settings
 from django.db.models import Q, Count
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.contrib.auth import authenticate
 from rest_framework import viewsets, status, generics
@@ -446,7 +447,22 @@ class ClubViewSet(viewsets.ModelViewSet):
     def join(self, request, pk=None):
         """Request to join a club."""
         club = self.get_object()
+        return self._create_or_reactivate_membership(request, club)
+    
+    @action(detail=False, methods=['post'], url_path='join-by-token/(?P<token>[^/]+)')
+    def join_by_token(self, request, token=None):
+        """Request to join a club via its private invite token (from an invite link).
         
+        Uses an opaque token instead of the numeric club id so invite links
+        can't be guessed/enumerated, and works for private clubs too. Treats
+        an existing membership as success (idempotent) so the caller always
+        gets back a club id to redirect to.
+        """
+        club = get_object_or_404(Club, invite_token=token, is_active=True)
+        return self._create_or_reactivate_membership(request, club, idempotent=True)
+    
+    def _create_or_reactivate_membership(self, request, club, idempotent=False):
+        """Shared logic for join / join_by_token."""
         # Check if already a member
         existing = ClubMembership.objects.filter(club=club, user=request.user).first()
         if existing:
@@ -456,6 +472,12 @@ class ClubViewSet(viewsets.ModelViewSet):
                 system_settings = SystemSettings.get_settings()
                 existing.status = 'active' if system_settings.auto_approve_club_memberships else 'pending'
                 existing.save()
+                return Response(
+                    ClubMembershipSerializer(existing).data,
+                    status=status.HTTP_200_OK
+                )
+            elif idempotent:
+                # Invite links are safe to reuse - just return the existing membership
                 return Response(
                     ClubMembershipSerializer(existing).data,
                     status=status.HTTP_200_OK

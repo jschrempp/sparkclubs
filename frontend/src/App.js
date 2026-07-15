@@ -40,7 +40,7 @@ function AppRoutes() {
           element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} 
         />
         <Route 
-          path="/join/:clubId" 
+          path="/join/:inviteToken" 
           element={<JoinClub />} 
         />
         <Route 

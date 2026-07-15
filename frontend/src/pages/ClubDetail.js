@@ -19,7 +19,8 @@ function ClubDetail() {
   const isClubAdmin = isSiteAdmin || members.find(m => m.user === user?.id && m.is_admin && m.status === 'active');
 
   const handleCopyInviteLink = async () => {
-    const inviteUrl = `${window.location.origin}/join/${id}`;
+    if (!club?.invite_token) return;
+    const inviteUrl = `${window.location.origin}/join/${club.invite_token}`;
     try {
       await navigator.clipboard.writeText(inviteUrl);
       setInviteCopied(true);

@@ -24,12 +24,12 @@ function Login() {
   const [showPasswords, setShowPasswords] = useState({});
 
   // After a successful login/registration, join any club the user was invited
-  // to via a /join/:clubId link, then send them there instead of the dashboard.
+  // to via a /join/:inviteToken link, then send them there instead of the dashboard.
   const completeAuth = async (token, userData) => {
     login(token, userData);
 
-    const pendingClubId = localStorage.getItem('pendingClubInvite');
-    if (pendingClubId) {
+    const pendingInviteToken = localStorage.getItem('pendingClubInvite');
+    if (pendingInviteToken) {
       if (userData.user_type === 'pending') {
         // Site account is still awaiting admin approval - the join request
         // can't go through yet. Keep the invite queued so it's retried the
@@ -39,12 +39,14 @@ function Login() {
       }
 
       try {
-        await clubsAPI.join(pendingClubId);
+        const membership = await clubsAPI.joinByToken(pendingInviteToken);
+        localStorage.removeItem('pendingClubInvite');
+        navigate(`/clubs/${membership.club}`);
       } catch (err) {
-        // Ignore errors here (e.g. already a member) - still take them to the club
+        // Invalid/expired invite - drop it and continue to the dashboard
+        localStorage.removeItem('pendingClubInvite');
+        navigate('/dashboard');
       }
-      localStorage.removeItem('pendingClubInvite');
-      navigate(`/clubs/${pendingClubId}`);
       return;
     }
 

@@ -4,20 +4,20 @@ import { useAuth } from '../AuthContext';
 import { clubsAPI } from '../api';
 
 function JoinClub() {
-  const { clubId } = useParams();
+  const { inviteToken } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated, isPending } = useAuth();
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!clubId) {
+    if (!inviteToken) {
       navigate('/');
       return;
     }
 
     if (!isAuthenticated) {
       // Remember which club to join once the user signs up / logs in
-      localStorage.setItem('pendingClubInvite', clubId);
+      localStorage.setItem('pendingClubInvite', inviteToken);
       navigate('/login');
       return;
     }
@@ -25,7 +25,7 @@ function JoinClub() {
     if (isPending) {
       // Site account is still awaiting admin approval - queue the invite so
       // it's retried automatically once the account is approved and they log in.
-      localStorage.setItem('pendingClubInvite', clubId);
+      localStorage.setItem('pendingClubInvite', inviteToken);
       navigate('/dashboard');
       return;
     }
@@ -34,23 +34,17 @@ function JoinClub() {
 
     (async () => {
       try {
-        await clubsAPI.join(clubId);
-        if (!cancelled) navigate(`/clubs/${clubId}`);
+        const membership = await clubsAPI.joinByToken(inviteToken);
+        if (!cancelled) navigate(`/clubs/${membership.club}`);
       } catch (err) {
-        const message = err.message || '';
-        if (/already a member|pending request/i.test(message)) {
-          // Already a member or has a pending request - just go to the club
-          if (!cancelled) navigate(`/clubs/${clubId}`);
-        } else if (!cancelled) {
-          setError(message || 'Unable to join this club.');
-        }
+        if (!cancelled) setError(err.message || 'Unable to join this club.');
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [clubId, isAuthenticated, isPending, navigate]);
+  }, [inviteToken, isAuthenticated, isPending, navigate]);
 
   return (
     <div className="container">

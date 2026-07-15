@@ -84,8 +84,8 @@ class ClubSerializer(serializers.ModelSerializer):
     class Meta:
         model = Club
         fields = ['id', 'name', 'description', 'zip_code', 'is_active', 'is_public', 'auto_approve_topics',
-                  'created_by', 'created_at', 'member_count', 'admin_count', 'user_membership']
-        read_only_fields = ['id', 'created_at', 'created_by']
+                  'created_by', 'created_at', 'member_count', 'admin_count', 'user_membership', 'invite_token']
+        read_only_fields = ['id', 'created_at', 'created_by', 'invite_token']
     
     def get_member_count(self, obj):
         return obj.memberships.filter(status='active').count()
