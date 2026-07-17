@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { authAPI } from './api';
+import { getToken, setToken, clearToken } from './tokenStore';
 
 const AuthContext = createContext(null);
 
@@ -16,13 +17,16 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const token = localStorage.getItem('token');
+    // The access token is kept in memory only (never in localStorage/
+    // sessionStorage) to reduce XSS exposure, so it does not survive a full
+    // page reload. If one is already present (e.g. hot reload during dev),
+    // validate it; otherwise the user simply needs to log in again.
+    const token = getToken();
     if (token) {
       authAPI.me()
         .then(setUser)
         .catch(() => {
-          localStorage.removeItem('token');
+          clearToken();
         })
         .finally(() => setLoading(false));
     } else {
@@ -31,12 +35,12 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = (token, userData) => {
-    localStorage.setItem('token', token);
+    setToken(token);
     setUser(userData);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    clearToken();
     setUser(null);
   };
 

@@ -1,0 +1,33 @@
+# Node/React build files and dependencies
+node_modules/
+dist/
+build/
+.next/
+out/
+*.min.js
+*.min.css
+
+# Package lockfiles (Massive token drains)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Django environment and cache files
+__pycache__/
+*.pyc
+.env
+.venv/
+env/
+venv/
+*.db
+*.sqlite3
+htmlcov/
+.coverage
+
+# Frontend/Backend Documentation or Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.docusaurus/
+docs/

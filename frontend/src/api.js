@@ -1,7 +1,9 @@
+import { getToken } from './tokenStore';
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
 const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
+  const token = getToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
