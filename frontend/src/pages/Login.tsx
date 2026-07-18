@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { authAPI, clubsAPI } from '../api';
 
-const USE_GOOGLE_OAUTH = process.env.REACT_APP_USE_GOOGLE_OAUTH === 'true';
+const USE_GOOGLE_OAUTH = import.meta.env.VITE_USE_GOOGLE_OAUTH === 'true';
 
 interface FormData {
   first_name: string;
@@ -301,7 +301,7 @@ const Login: React.FC = () => {
 
   if (USE_GOOGLE_OAUTH) {
     return (
-      <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || ''}>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ''}>
         <div className="container">
           <div className="card" style={{ maxWidth: '500px', margin: '100px auto', textAlign: 'center' }}>
             <h1>Welcome to Spark Clubs</h1>
