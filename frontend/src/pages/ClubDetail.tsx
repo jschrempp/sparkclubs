@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { clubsAPI, topicsAPI, eventsAPI, membershipsAPI } from '../api';
 import { useAuth } from '../AuthContext';
@@ -50,17 +51,140 @@ interface Club {
 const ClubDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [club, setClub] = useState<Club | null>(null);
-  const [topics, setTopics] = useState<Topic[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [activeTab, setActiveTab] = useState('topics');
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const { user, isSiteAdmin, isSuperAdmin } = useAuth();
+
+  const [activeTab, setActiveTab] = useState('topics');
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [showTopicForm, setShowTopicForm] = useState(false);
+  const [topicFormData, setTopicFormData] = useState({ title: '', description: '', tabs: '' });
+  const [editingTopicId, setEditingTopicId] = useState<number | null>(null);
+  const [showEditClubForm, setShowEditClubForm] = useState(false);
+  const [clubFormData, setClubFormData] = useState({ name: '', description: '', zip_code: '', is_public: true, auto_approve_topics: false });
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [eventFormData, setEventFormData] = useState({
+    title: '', topic_ids: [] as number[], start_datetime: '', end_datetime: '',
+    location: '', host: '', status: 'pending',
+  });
 
-  const isClubAdmin = isSiteAdmin || members.find(m => m.user === user?.id && m.is_admin && m.status === 'active');
+  const { data: club, isLoading: loading } = useQuery({
+    queryKey: ['club', id],
+    queryFn: () => clubsAPI.get(id!),
+    enabled: !!id,
+  });
 
+  const { data: topics = [] } = useQuery({
+    queryKey: ['topics', id],
+    queryFn: async () => {
+      const data = await topicsAPI.list(id!);
+      return Array.isArray(data) ? data : (data.results || []);
+    },
+    enabled: !!id,
+  });
+
+  const { data: events = [] } = useQuery({
+    queryKey: ['events', id],
+    queryFn: async () => {
+      const data = await eventsAPI.list(id!);
+      return Array.isArray(data) ? data : (data.results || []);
+    },
+    enabled: !!id,
+  });
+
+  const { data: members = [] } = useQuery({
+    queryKey: ['members', id],
+    queryFn: async () => {
+      const data = await clubsAPI.getMembers(id!);
+      return Array.isArray(data) ? data : (data.results || []);
+    },
+    enabled: !!id,
+  });
+
+  const isClubAdmin = isSiteAdmin || members.find((m: Member) => m.user === user?.id && m.is_admin && m.status === 'active');
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['club', id] });
+    queryClient.invalidateQueries({ queryKey: ['topics', id] });
+    queryClient.invalidateQueries({ queryKey: ['events', id] });
+    queryClient.invalidateQueries({ queryKey: ['members', id] });
+  };
+
+  // Mutations
+  const rsvpMutation = useMutation({
+    mutationFn: (eventId: number) => eventsAPI.rsvp(eventId, 'attending'),
+    onSuccess: () => { alert('RSVP successful!'); invalidateAll(); },
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const interestMutation = useMutation({
+    mutationFn: topicsAPI.expressInterest,
+    onSuccess: () => invalidateAll(),
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const approveMemberMutation = useMutation({
+    mutationFn: (membershipId: number) => membershipsAPI.update(membershipId, { status: 'active' }),
+    onSuccess: () => { alert('Member approved!'); invalidateAll(); },
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (membershipId: number) => membershipsAPI.update(membershipId, { status: 'removed' }),
+    onSuccess: () => { alert('Member removed'); invalidateAll(); },
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const toggleAdminMutation = useMutation({
+    mutationFn: ({ membershipId, isAdmin }: { membershipId: number; isAdmin: boolean }) =>
+      membershipsAPI.update(membershipId, { is_admin: isAdmin }),
+    onSuccess: (_data, vars) => {
+      alert(`Admin status ${vars.isAdmin ? 'granted' : 'removed'}`);
+      invalidateAll();
+    },
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const topicMutation = useMutation({
+    mutationFn: ({ topicId, data }: { topicId?: number; data: Record<string, unknown> }) =>
+      topicId ? topicsAPI.update(topicId, data) : topicsAPI.create(data),
+    onSuccess: () => {
+      alert(editingTopicId ? 'Topic updated!' : 'Topic added! Pending admin approval.');
+      setShowTopicForm(false);
+      setEditingTopicId(null);
+      setTopicFormData({ title: '', description: '', tabs: '' });
+      invalidateAll();
+    },
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const updateClubMutation = useMutation({
+    mutationFn: (data: typeof clubFormData) => clubsAPI.update(id!, data),
+    onSuccess: () => { alert('Club updated!'); setShowEditClubForm(false); invalidateAll(); },
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const topicStatusMutation = useMutation({
+    mutationFn: ({ topicId, status }: { topicId: number; status: string }) =>
+      topicsAPI.update(topicId, { status }),
+    onSuccess: () => { alert('Topic status updated!'); invalidateAll(); },
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const eventMutation = useMutation({
+    mutationFn: ({ eventId, data }: { eventId?: number; data: Record<string, unknown> }) =>
+      eventId ? eventsAPI.update(eventId, data) : eventsAPI.create(data),
+    onSuccess: () => {
+      alert(editingEventId ? 'Event updated!' : 'Event created!');
+      setShowEventForm(false);
+      setEditingEventId(null);
+      setEventFormData({ title: '', topic_ids: [], start_datetime: '', end_datetime: '', location: '', host: '', status: 'pending' });
+      invalidateAll();
+    },
+    onError: (err: Error) => alert(err.message),
+  });
+
+  // Handlers
   const handleCopyInviteLink = async () => {
     if (!club?.invite_token) return;
     const inviteUrl = `${window.location.origin}/join/${club.invite_token}`;
@@ -72,223 +196,50 @@ const ClubDetail: React.FC = () => {
       window.prompt('Copy this invite link:', inviteUrl);
     }
   };
-  
-  const [showTopicForm, setShowTopicForm] = useState(false);
-  const [topicFormData, setTopicFormData] = useState({ title: '', description: '', tabs: '' });
-  const [editingTopicId, setEditingTopicId] = useState<number | null>(null);
-  const [showEditClubForm, setShowEditClubForm] = useState(false);
-  const [clubFormData, setClubFormData] = useState({
-    name: '', description: '', zip_code: '', is_public: true, auto_approve_topics: false,
-  });
-  const [showEventForm, setShowEventForm] = useState(false);
-  const [editingEventId, setEditingEventId] = useState<number | null>(null);
-  const [eventFormData, setEventFormData] = useState({
-    title: '', topic_ids: [] as number[], start_datetime: '', end_datetime: '',
-    location: '', host: '', status: 'pending',
-  });
 
-  const loadClubData = useCallback(async () => {
-    if (!id) return;
-    try {
-      const [clubData, topicsData, eventsData, membersData] = await Promise.all([
-        clubsAPI.get(id),
-        topicsAPI.list(id),
-        eventsAPI.list(id),
-        clubsAPI.getMembers(id),
-      ]);
-      setClub(clubData);
-      setTopics(Array.isArray(topicsData) ? topicsData : (topicsData.results || []));
-      setEvents(Array.isArray(eventsData) ? eventsData : (eventsData.results || []));
-      setMembers(Array.isArray(membersData) ? membersData : (membersData.results || []));
-      setClubFormData({
-        name: clubData.name,
-        description: clubData.description,
-        zip_code: clubData.zip_code,
-        is_public: clubData.is_public !== undefined ? clubData.is_public : true,
-        auto_approve_topics: clubData.auto_approve_topics !== undefined ? clubData.auto_approve_topics : false,
-      });
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    loadClubData();
-  }, [loadClubData]);
-
-  const handleRSVP = async (eventId: number) => {
-    try {
-      await eventsAPI.rsvp(eventId, 'attending');
-      alert('RSVP successful!');
-      loadClubData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
-
-  const handleSetInterest = async (topicId: number, interestType: string) => {
-    try {
-      await topicsAPI.expressInterest(topicId);
-      loadClubData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
-
-  const handleRemoveInterest = async (topicId: number) => {
-    try {
-      await topicsAPI.expressInterest(topicId);
-      loadClubData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
-
-  const handleApproveMember = async (membershipId: number) => {
-    try {
-      await membershipsAPI.update(membershipId, { status: 'active' });
-      alert('Member approved!');
-      loadClubData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
-
-  const handleRemoveMember = async (membershipId: number) => {
-    if (!window.confirm('Are you sure you want to remove this member?')) return;
-    try {
-      await membershipsAPI.update(membershipId, { status: 'removed' });
-      alert('Member removed');
-      loadClubData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
-
-  const handleToggleAdmin = async (membershipId: number, isCurrentlyAdmin: boolean) => {
-    try {
-      await membershipsAPI.update(membershipId, { is_admin: !isCurrentlyAdmin });
-      alert(`Admin status ${!isCurrentlyAdmin ? 'granted' : 'removed'}`);
-      loadClubData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
-
-  const handleCreateTopic = async (e: React.FormEvent) => {
+  const handleCreateTopic = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const topicData = { ...topicFormData, club: id };
-      if (editingTopicId) {
-        await topicsAPI.update(editingTopicId, topicData);
-        alert('Topic updated successfully!');
-      } else {
-        await topicsAPI.create(topicData);
-        alert('Topic added successfully! It will be pending until approved by an admin.');
-      }
-      setShowTopicForm(false);
-      setEditingTopicId(null);
-      setTopicFormData({ title: '', description: '', tabs: '' });
-      loadClubData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
+    topicMutation.mutate({ topicId: editingTopicId ?? undefined, data: { ...topicFormData, club: id } });
   };
 
-  const handleUpdateClub = async (e: React.FormEvent) => {
+  const handleUpdateClub = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id) return;
-    try {
-      await clubsAPI.update(id, clubFormData);
-      alert('Club updated successfully!');
-      setShowEditClubForm(false);
-      loadClubData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
+    updateClubMutation.mutate(clubFormData);
   };
 
-  const handleChangeTopicStatus = async (topicId: number, newStatus: string) => {
-    try {
-      await topicsAPI.update(topicId, { status: newStatus });
-      alert('Topic status updated!');
-      loadClubData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
-
-  const handleCancelTopicForm = () => {
-    setShowTopicForm(false);
-    setEditingTopicId(null);
-    setTopicFormData({ title: '', description: '', tabs: '' });
-  };
-
-  const handleCreateOrUpdateEvent = async (e: React.FormEvent) => {
+  const handleCreateOrUpdateEvent = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const eventData = {
-        title: eventFormData.title,
-        topic_ids: eventFormData.topic_ids,
-        start_datetime: eventFormData.start_datetime,
-        end_datetime: eventFormData.end_datetime,
-        location: eventFormData.location,
-        host: eventFormData.host,
-        status: eventFormData.status,
-        club: id,
-      };
-
-      if (editingEventId) {
-        await eventsAPI.update(editingEventId, eventData);
-        alert('Event updated successfully!');
-      } else {
-        await eventsAPI.create(eventData);
-        alert('Event created successfully!');
-      }
-
-      handleCancelEventForm();
-      loadClubData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
+    eventMutation.mutate({
+      eventId: editingEventId ?? undefined,
+      data: { ...eventFormData, club: id },
+    });
   };
 
   const handleEditEvent = (event: Event) => {
     setEditingEventId(event.id);
     setEventFormData({
-      title: event.title,
-      topic_ids: event.topics ? event.topics.map(t => t.id) : [],
-      start_datetime: event.start_datetime,
-      end_datetime: event.end_datetime,
-      location: event.location,
-      host: String(event.host),
-      status: event.status,
+      title: event.title, topic_ids: event.topics ? event.topics.map(t => t.id) : [],
+      start_datetime: event.start_datetime, end_datetime: event.end_datetime,
+      location: event.location, host: String(event.host), status: event.status,
     });
     setShowEventForm(true);
   };
 
-  const handleCancelEventForm = () => {
-    setShowEventForm(false);
-    setEditingEventId(null);
-    setEventFormData({
-      title: '', topic_ids: [], start_datetime: '', end_datetime: '',
-      location: '', host: '', status: 'pending',
-    });
+  const handleDeleteClub = () => {
+    if (!window.confirm('Delete this club? This cannot be undone.')) return;
+    updateClubMutation.mutate(clubFormData);
+    navigate('/clubs');
   };
 
-  const handleDeleteClub = async () => {
-    if (!id) return;
-    if (!window.confirm('Are you sure you want to delete this club? This will remove all topics and members from the club. This action cannot be undone.')) return;
-    try {
-      await clubsAPI.update(id, {});
-      alert('Club deleted successfully!');
-      navigate('/clubs');
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
+  // Sync clubFormData when club loads
+  React.useEffect(() => {
+    if (club) {
+      setClubFormData({
+        name: club.name, description: club.description, zip_code: club.zip_code,
+        is_public: club.is_public ?? true, auto_approve_topics: club.auto_approve_topics ?? false,
+      });
     }
-  };
+  }, [club]);
 
   if (loading) return <div className="loading">Loading club...</div>;
   if (!club) return <div>Club not found</div>;
@@ -309,7 +260,7 @@ const ClubDetail: React.FC = () => {
             <p><strong>Members:</strong> {club.member_count}</p>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-            <button className="btn btn-secondary" onClick={handleCopyInviteLink} title="Copy a link you can share to invite someone to this club">
+            <button className="btn btn-secondary" onClick={handleCopyInviteLink} title="Copy invite link">
               {inviteCopied ? '✓ Link Copied!' : '🔗 Copy Invite Link'}
             </button>
             {isClubAdmin && (
@@ -317,9 +268,7 @@ const ClubDetail: React.FC = () => {
                 {showEditClubForm ? 'Cancel' : 'Edit Club'}
               </button>
             )}
-            {isSuperAdmin && (
-              <button className="btn btn-danger" onClick={handleDeleteClub}>Delete Club</button>
-            )}
+            {isSuperAdmin && <button className="btn btn-danger" onClick={handleDeleteClub}>Delete Club</button>}
           </div>
         </div>
 
@@ -337,21 +286,23 @@ const ClubDetail: React.FC = () => {
               </div>
               <div className="form-group">
                 <label>Zip Code *</label>
-                <input type="text" className="form-control" value={clubFormData.zip_code} onChange={(e) => setClubFormData({...clubFormData, zip_code: e.target.value})} pattern="[0-9]{5}" title="Enter a valid 5-digit zip code" required />
+                <input type="text" className="form-control" value={clubFormData.zip_code} onChange={(e) => setClubFormData({...clubFormData, zip_code: e.target.value})} pattern="[0-9]{5}" title="5-digit zip" required />
               </div>
               <div className="form-group">
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                   <input type="checkbox" checked={clubFormData.is_public} onChange={(e) => setClubFormData({...clubFormData, is_public: e.target.checked})} style={{ marginRight: '10px', width: '20px', height: '20px' }} />
-                  <span><strong>Public Club</strong><span style={{ display: 'block', fontSize: '0.9rem', color: '#666' }}>Public clubs are visible to all users. Private clubs are only visible to members.</span></span>
+                  <span><strong>Public Club</strong><span style={{ display: 'block', fontSize: '0.9rem', color: '#666' }}>Public clubs are visible to all users.</span></span>
                 </label>
               </div>
               <div className="form-group">
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                   <input type="checkbox" checked={clubFormData.auto_approve_topics} onChange={(e) => setClubFormData({...clubFormData, auto_approve_topics: e.target.checked})} style={{ marginRight: '10px', width: '20px', height: '20px' }} />
-                  <span><strong>Auto-approve Topics</strong><span style={{ display: 'block', fontSize: '0.9rem', color: '#666' }}>Automatically approve topics when members add them. When disabled, admins must manually approve topics.</span></span>
+                  <span><strong>Auto-approve Topics</strong><span style={{ display: 'block', fontSize: '0.9rem', color: '#666' }}>Automatically approve topics from members.</span></span>
                 </label>
               </div>
-              <button type="submit" className="btn btn-primary">Update Club</button>
+              <button type="submit" className="btn btn-primary" disabled={updateClubMutation.isPending}>
+                {updateClubMutation.isPending ? 'Updating...' : 'Update Club'}
+              </button>
             </form>
           </div>
         )}
@@ -387,8 +338,10 @@ const ClubDetail: React.FC = () => {
                     <label>Tags (comma-separated)</label>
                     <input type="text" className="form-control" value={topicFormData.tabs} onChange={(e) => setTopicFormData({...topicFormData, tabs: e.target.value})} maxLength={128} placeholder="e.g., philosophy, science, history" />
                   </div>
-                  <button type="submit" className="btn btn-primary">{editingTopicId ? 'Update Topic' : 'Add Topic'}</button>
-                  {editingTopicId && <button type="button" className="btn btn-secondary" onClick={handleCancelTopicForm} style={{ marginLeft: '10px' }}>Cancel</button>}
+                  <button type="submit" className="btn btn-primary" disabled={topicMutation.isPending}>
+                    {topicMutation.isPending ? 'Saving...' : editingTopicId ? 'Update Topic' : 'Add Topic'}
+                  </button>
+                  {editingTopicId && <button type="button" className="btn btn-secondary" onClick={() => { setShowTopicForm(false); setEditingTopicId(null); setTopicFormData({ title: '', description: '', tabs: '' }); }} style={{ marginLeft: '10px' }}>Cancel</button>}
                 </form>
               </div>
             )}
@@ -397,7 +350,7 @@ const ClubDetail: React.FC = () => {
               <p>No topics yet. Add a topic to get started!</p>
             ) : (
               <div className="topics-list">
-                {topics.map((topic) => (
+                {topics.map((topic: Topic) => (
                   <div key={topic.id} className="card mb-2" style={{ padding: '16px' }}>
                     <h4 style={{ margin: '0 0 8px 0', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.title}</h4>
                     {topic.description && <p style={{ margin: '0 0 12px 0', color: '#333', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.description}</p>}
@@ -405,7 +358,7 @@ const ClubDetail: React.FC = () => {
                       {topic.tabs && <span>🏷 {topic.tabs}</span>}
                       <span>👤 {topic.created_by_name}</span>
                       {isClubAdmin ? (
-                        <select className="form-control" style={{ width: 'auto', fontSize: 'inherit', padding: '2px 4px' }} value={topic.status} onChange={(e) => handleChangeTopicStatus(topic.id, e.target.value)}>
+                        <select className="form-control" style={{ width: 'auto', fontSize: 'inherit', padding: '2px 4px' }} value={topic.status} onChange={(e) => topicStatusMutation.mutate({ topicId: topic.id, status: e.target.value })}>
                           <option value="pending">Pending</option>
                           <option value="active">Active</option>
                           <option value="inactive">Inactive</option>
@@ -424,7 +377,7 @@ const ClubDetail: React.FC = () => {
                       )}
                     </div>
                     <div style={{ marginTop: '10px' }}>
-                      <select className="form-control" style={{ width: 'auto' }} value={topic.user_interest || ''} onChange={(e) => { const value = e.target.value; if (value === '') { handleRemoveInterest(topic.id); } else { handleSetInterest(topic.id, value); } }} title="Set my interest in this topic">
+                      <select className="form-control" style={{ width: 'auto' }} value={topic.user_interest || ''} onChange={(e) => { if (e.target.value) interestMutation.mutate(topic.id); }} title="Set my interest">
                         <option value="">My interest: none</option>
                         <option value="interested">👍 Interested</option>
                         <option value="able_to_lead">🎤 I can lead this discussion</option>
@@ -455,12 +408,12 @@ const ClubDetail: React.FC = () => {
                   </div>
                   <div className="form-group">
                     <label>Topics (select multiple)</label>
-                    <select multiple className="form-control" value={eventFormData.topic_ids.map(String)} onChange={(e) => { const selectedIds = Array.from(e.target.selectedOptions, option => parseInt(option.value)); setEventFormData({...eventFormData, topic_ids: selectedIds}); }} style={{ height: '100px' }}>
-                      {topics.filter(t => t.status === 'active').map(topic => (
+                    <select multiple className="form-control" value={eventFormData.topic_ids.map(String)} onChange={(e) => { const ids = Array.from(e.target.selectedOptions, o => parseInt(o.value)); setEventFormData({...eventFormData, topic_ids: ids}); }} style={{ height: '100px' }}>
+                      {topics.filter((t: Topic) => t.status === 'active').map((topic: Topic) => (
                         <option key={topic.id} value={topic.id}>{topic.title}</option>
                       ))}
                     </select>
-                    <small>Hold Ctrl (Cmd on Mac) to select multiple topics</small>
+                    <small>Hold Ctrl (Cmd on Mac) to select multiple</small>
                   </div>
                   <div className="form-group">
                     <label>Start Date/Time *</label>
@@ -478,7 +431,7 @@ const ClubDetail: React.FC = () => {
                     <label>Host</label>
                     <select className="form-control" value={eventFormData.host} onChange={(e) => setEventFormData({...eventFormData, host: e.target.value})}>
                       <option value="">-- Select Host --</option>
-                      {members.filter(m => m.status === 'active').map(member => (
+                      {members.filter((m: Member) => m.status === 'active').map((member: Member) => (
                         <option key={member.user} value={member.user}>{member.user_name}</option>
                       ))}
                     </select>
@@ -492,8 +445,10 @@ const ClubDetail: React.FC = () => {
                       <option value="cancelled">Cancelled</option>
                     </select>
                   </div>
-                  <button type="submit" className="btn btn-primary">{editingEventId ? 'Update Event' : 'Create Event'}</button>
-                  <button type="button" className="btn btn-secondary" onClick={handleCancelEventForm} style={{ marginLeft: '10px' }}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={eventMutation.isPending}>
+                    {eventMutation.isPending ? 'Saving...' : editingEventId ? 'Update Event' : 'Create Event'}
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => { setShowEventForm(false); setEditingEventId(null); setEventFormData({ title: '', topic_ids: [], start_datetime: '', end_datetime: '', location: '', host: '', status: 'pending' }); }} style={{ marginLeft: '10px' }}>Cancel</button>
                 </form>
               </div>
             )}
@@ -502,7 +457,7 @@ const ClubDetail: React.FC = () => {
               <p>No events yet</p>
             ) : (
               <div>
-                {events.map(event => (
+                {events.map((event: Event) => (
                   <div key={event.id} className="card mb-2">
                     <h4>{event.title}</h4>
                     <p><strong>Date:</strong> {new Date(event.start_datetime).toLocaleString()}</p>
@@ -512,7 +467,7 @@ const ClubDetail: React.FC = () => {
                     <p><strong>Status:</strong> <span className={`badge badge-${event.status}`}>{event.status}</span></p>
                     <p><strong>Attending:</strong> {event.attendance_count}</p>
                     <div style={{ display: 'flex', gap: '10px' }}>
-                      <button className="btn btn-primary btn-sm" onClick={() => handleRSVP(event.id)}>RSVP</button>
+                      <button className="btn btn-primary btn-sm" onClick={() => rsvpMutation.mutate(event.id)} disabled={rsvpMutation.isPending}>RSVP</button>
                       {isClubAdmin && <button className="btn btn-secondary btn-sm" onClick={() => handleEditEvent(event)}>Edit</button>}
                     </div>
                   </div>
@@ -539,7 +494,7 @@ const ClubDetail: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map(member => (
+                  {members.map((member: Member) => (
                     <tr key={member.id}>
                       <td>{member.user_name}</td>
                       <td><span className={`badge badge-${member.status}`}>{member.status}</span></td>
@@ -549,12 +504,12 @@ const ClubDetail: React.FC = () => {
                         <td>
                           <div style={{ display: 'flex', gap: '5px' }}>
                             {member.status === 'pending' && (
-                              <button className="btn btn-sm btn-success" onClick={() => handleApproveMember(member.id)}>Approve</button>
+                              <button className="btn btn-sm btn-success" onClick={() => approveMemberMutation.mutate(member.id)}>Approve</button>
                             )}
-                            <button className="btn btn-sm btn-secondary" onClick={() => handleToggleAdmin(member.id, member.is_admin)}>
+                            <button className="btn btn-sm btn-secondary" onClick={() => toggleAdminMutation.mutate({ membershipId: member.id, isAdmin: !member.is_admin })}>
                               {member.is_admin ? 'Remove Admin' : 'Make Admin'}
                             </button>
-                            <button className="btn btn-sm btn-danger" onClick={() => handleRemoveMember(member.id)}>Remove</button>
+                            <button className="btn btn-sm btn-danger" onClick={() => removeMemberMutation.mutate(member.id)}>Remove</button>
                           </div>
                         </td>
                       )}

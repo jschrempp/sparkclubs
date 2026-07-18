@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersAPI, systemSettingsAPI } from '../api';
 
 interface User {
@@ -24,97 +25,80 @@ interface SystemSettings {
   auto_approve_club_memberships: boolean;
 }
 
+const getStatusBadgeColor = (status: string) => {
+  switch(status) {
+    case 'active': return 'success';
+    case 'pending': return 'warning';
+    case 'removed': return 'danger';
+    default: return 'secondary';
+  }
+};
+
 const Admin: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
-  const [settingsLoading, setSettingsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    loadUsers();
-    loadSystemSettings();
-  }, []);
-
-  const loadUsers = async () => {
-    try {
+  const { data: users = [], isLoading: loading } = useQuery({
+    queryKey: ['adminUsers'],
+    queryFn: async () => {
       const data = await usersAPI.list();
-      setUsers(Array.isArray(data) ? data : (data.results || []));
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return Array.isArray(data) ? data : (data.results || []);
+    },
+  });
 
-  const loadSystemSettings = async () => {
-    try {
-      const data = await systemSettingsAPI.getSettings();
-      setSystemSettings(data);
-    } catch (err: unknown) {
-      console.error('Failed to load system settings:', err);
-    } finally {
-      setSettingsLoading(false);
-    }
-  };
+  const { data: systemSettings, isLoading: settingsLoading } = useQuery({
+    queryKey: ['systemSettings'],
+    queryFn: systemSettingsAPI.getSettings,
+  });
 
-  const handleUpdateUserType = async (userId: number, newType: string) => {
-    try {
-      await usersAPI.updateUserType(userId, newType);
-      loadUsers();
+  const updateUserTypeMutation = useMutation({
+    mutationFn: ({ userId, newType }: { userId: number; newType: string }) => usersAPI.updateUserType(userId, newType),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
       alert('User type updated successfully');
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
+    },
+    onError: (err: Error) => alert(err.message),
+  });
 
-  const handleToggleAutoApproval = async () => {
-    if (!systemSettings) return;
-    try {
-      const newValue = !systemSettings.auto_approve_users;
-      const updatedSettings = await systemSettingsAPI.updateSettings({
-        auto_approve_users: newValue
-      });
-      setSystemSettings(updatedSettings);
-      alert(`User auto-approval ${newValue ? 'enabled' : 'disabled'} successfully`);
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Failed to update settings');
-    }
-  };
+  const updateSettingsMutation = useMutation({
+    mutationFn: systemSettingsAPI.updateSettings,
+    onSuccess: (data) => {
+      queryClient.setQueryData(['systemSettings'], data);
+    },
+    onError: (err: Error) => alert(err.message || 'Failed to update settings'),
+  });
 
-  const handleToggleClubAutoApproval = async () => {
-    if (!systemSettings) return;
-    try {
-      const newValue = !systemSettings.auto_approve_club_memberships;
-      const updatedSettings = await systemSettingsAPI.updateSettings({
-        auto_approve_club_memberships: newValue
-      });
-      setSystemSettings(updatedSettings);
-      alert(`Club membership auto-approval ${newValue ? 'enabled' : 'disabled'} successfully`);
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Failed to update settings');
-    }
-  };
-
-  const handleIncreaseClubLimit = async (userId: number) => {
-    try {
-      const result = await usersAPI.increaseClubLimit(userId);
-      loadUsers();
+  const increaseClubLimitMutation = useMutation({
+    mutationFn: usersAPI.increaseClubLimit,
+    onSuccess: (result: { message: string }) => {
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
       alert(result.message);
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
+    },
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const handleUpdateUserType = (userId: number, newType: string) => {
+    updateUserTypeMutation.mutate({ userId, newType });
+  };
+
+  const handleToggleAutoApproval = () => {
+    if (!systemSettings) return;
+    const newValue = !systemSettings.auto_approve_users;
+    updateSettingsMutation.mutate({ auto_approve_users: newValue });
+    alert(`User auto-approval ${newValue ? 'enabled' : 'disabled'} successfully`);
+  };
+
+  const handleToggleClubAutoApproval = () => {
+    if (!systemSettings) return;
+    const newValue = !systemSettings.auto_approve_club_memberships;
+    updateSettingsMutation.mutate({ auto_approve_club_memberships: newValue });
+    alert(`Club membership auto-approval ${newValue ? 'enabled' : 'disabled'} successfully`);
+  };
+
+  const handleIncreaseClubLimit = (userId: number) => {
+    increaseClubLimitMutation.mutate(userId);
   };
 
   if (loading) return <div className="loading">Loading users...</div>;
-
-  const getStatusBadgeColor = (status: string) => {
-    switch(status) {
-      case 'active': return 'success';
-      case 'pending': return 'warning';
-      case 'removed': return 'danger';
-      default: return 'secondary';
-    }
-  };
 
   const renderClubMemberships = (memberships: User['club_memberships']) => {
     if (!memberships || memberships.length === 0) {
@@ -125,12 +109,8 @@ const Admin: React.FC = () => {
         {memberships.map((membership) => (
           <div key={membership.club_id} className="club-membership-item">
             <span className="club-name">{membership.club_name}</span>
-            {membership.is_admin && (
-              <span className="badge badge-primary admin-badge">Admin</span>
-            )}
-            <span className={`badge badge-${getStatusBadgeColor(membership.status)} status-badge`}>
-              {membership.status}
-            </span>
+            {membership.is_admin && <span className="badge badge-primary admin-badge">Admin</span>}
+            <span className={`badge badge-${getStatusBadgeColor(membership.status)} status-badge`}>{membership.status}</span>
           </div>
         ))}
       </div>
@@ -146,33 +126,12 @@ const Admin: React.FC = () => {
           <h2 style={{ fontSize: '1.2rem', marginBottom: '15px' }}>System Settings</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '1rem' }}>
-              <input
-                type="checkbox"
-                checked={systemSettings.auto_approve_users}
-                onChange={handleToggleAutoApproval}
-                style={{ width: '20px', height: '20px', marginRight: '10px', cursor: 'pointer', flexShrink: 0 }}
-              />
-              <span>
-                <strong>Auto-approve new users</strong>
-                <span style={{ display: 'block', fontSize: '0.9rem', color: '#666', marginTop: '3px' }}>
-                  When enabled, new registrations are automatically approved as members instead of pending
-                </span>
-              </span>
+              <input type="checkbox" checked={systemSettings.auto_approve_users} onChange={handleToggleAutoApproval} style={{ width: '20px', height: '20px', marginRight: '10px', cursor: 'pointer', flexShrink: 0 }} />
+              <span><strong>Auto-approve new users</strong><span style={{ display: 'block', fontSize: '0.9rem', color: '#666', marginTop: '3px' }}>When enabled, new registrations are automatically approved as members instead of pending</span></span>
             </label>
-            
             <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '1rem' }}>
-              <input
-                type="checkbox"
-                checked={systemSettings.auto_approve_club_memberships}
-                onChange={handleToggleClubAutoApproval}
-                style={{ width: '20px', height: '20px', marginRight: '10px', cursor: 'pointer', flexShrink: 0 }}
-              />
-              <span>
-                <strong>Auto-approve club membership requests</strong>
-                <span style={{ display: 'block', fontSize: '0.9rem', color: '#666', marginTop: '3px' }}>
-                  When enabled, users joining clubs are automatically approved as active members instead of pending
-                </span>
-              </span>
+              <input type="checkbox" checked={systemSettings.auto_approve_club_memberships} onChange={handleToggleClubAutoApproval} style={{ width: '20px', height: '20px', marginRight: '10px', cursor: 'pointer', flexShrink: 0 }} />
+              <span><strong>Auto-approve club membership requests</strong><span style={{ display: 'block', fontSize: '0.9rem', color: '#666', marginTop: '3px' }}>When enabled, users joining clubs are automatically approved as active members instead of pending</span></span>
             </label>
           </div>
         </div>
@@ -192,40 +151,21 @@ const Admin: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {users.map((user: User) => (
               <tr key={user.id}>
                 <td>{user.first_name} {user.last_name}</td>
                 <td>{user.email}</td>
                 <td>{user.zip_code}</td>
-                <td className="clubs-column">
-                  {renderClubMemberships(user.club_memberships)}
-                </td>
+                <td className="clubs-column">{renderClubMemberships(user.club_memberships)}</td>
                 <td style={{ textAlign: 'center' }}>
-                  <span className="badge badge-primary" style={{ marginRight: '5px' }}>
-                    {user.clubs_created_count || 0} / {user.club_creation_limit || 5}
-                  </span>
+                  <span className="badge badge-primary" style={{ marginRight: '5px' }}>{user.clubs_created_count || 0} / {user.club_creation_limit || 5}</span>
                   {user.user_type !== 'site_admin' && user.user_type !== 'super_admin' && (
-                    <button
-                      className="btn btn-sm btn-success"
-                      onClick={() => handleIncreaseClubLimit(user.id)}
-                      title="Increase limit by 5"
-                      style={{ padding: '2px 6px', fontSize: '0.8rem' }}
-                    >
-                      +5
-                    </button>
+                    <button className="btn btn-sm btn-success" onClick={() => handleIncreaseClubLimit(user.id)} title="Increase limit by 5" style={{ padding: '2px 6px', fontSize: '0.8rem' }}>+5</button>
                   )}
                 </td>
+                <td><span className={`badge badge-${user.user_type}`}>{user.user_type}</span></td>
                 <td>
-                  <span className={`badge badge-${user.user_type}`}>
-                    {user.user_type}
-                  </span>
-                </td>
-                <td>
-                  <select 
-                    className="form-control"
-                    value={user.user_type}
-                    onChange={(e) => handleUpdateUserType(user.id, e.target.value)}
-                  >
+                  <select className="form-control" value={user.user_type} onChange={(e) => handleUpdateUserType(user.id, e.target.value)}>
                     <option value="pending">Pending</option>
                     <option value="member">Member</option>
                     <option value="site_admin">Site Admin</option>

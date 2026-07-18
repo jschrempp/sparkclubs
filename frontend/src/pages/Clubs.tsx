@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { clubsAPI } from '../api';
 
@@ -16,9 +17,7 @@ interface Club {
 }
 
 const Clubs: React.FC = () => {
-  const [clubs, setClubs] = useState<Club[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const queryClient = useQueryClient();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -27,62 +26,59 @@ const Clubs: React.FC = () => {
     is_public: true,
   });
 
-  useEffect(() => {
-    loadClubs();
-  }, []);
-
-  const loadClubs = async () => {
-    try {
+  const { data: clubs = [], isLoading: loading, error } = useQuery({
+    queryKey: ['clubs'],
+    queryFn: async () => {
       const data = await clubsAPI.list();
-      setClubs(Array.isArray(data) ? data : (data.results || []));
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
+      return Array.isArray(data) ? data : (data.results || []);
+    },
+  });
 
-  const handleJoinClub = async (clubId: number) => {
-    try {
-      await clubsAPI.join(clubId);
-      alert('Join request sent! Waiting for admin approval.');
-      loadClubs();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
+  const joinMutation = useMutation({
+    mutationFn: clubsAPI.join,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clubs'] });
+    },
+    onError: (err: Error) => alert(err.message),
+  });
 
-  const handleCancelRequest = async (clubId: number) => {
-    if (!window.confirm('Are you sure you want to cancel your join request?')) return;
-    try {
-      await clubsAPI.leave(clubId);
-      alert('Join request cancelled.');
-      loadClubs();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
+  const leaveMutation = useMutation({
+    mutationFn: clubsAPI.leave,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clubs'] });
+    },
+    onError: (err: Error) => alert(err.message),
+  });
 
-  const handleRejoin = async (clubId: number) => {
-    try {
-      await clubsAPI.join(clubId);
-      alert('Rejoin request sent! Waiting for admin approval.');
-      loadClubs();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
-  };
-
-  const handleCreateClub = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await clubsAPI.create(formData);
+  const createMutation = useMutation({
+    mutationFn: (data: typeof formData) => clubsAPI.create(data),
+    onSuccess: () => {
       setShowCreateForm(false);
       setFormData({ name: '', description: '', zip_code: '', is_public: true });
-      loadClubs();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'An error occurred');
-    }
+      queryClient.invalidateQueries({ queryKey: ['clubs'] });
+    },
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const handleJoinClub = (clubId: number) => {
+    joinMutation.mutate(clubId);
+    alert('Join request sent! Waiting for admin approval.');
+  };
+
+  const handleCancelRequest = (clubId: number) => {
+    if (!window.confirm('Are you sure you want to cancel your join request?')) return;
+    leaveMutation.mutate(clubId);
+    alert('Join request cancelled.');
+  };
+
+  const handleRejoin = (clubId: number) => {
+    joinMutation.mutate(clubId);
+    alert('Rejoin request sent! Waiting for admin approval.');
+  };
+
+  const handleCreateClub = (e: React.FormEvent) => {
+    e.preventDefault();
+    createMutation.mutate(formData);
   };
 
   if (loading) return <div className="loading">Loading clubs...</div>;
@@ -99,7 +95,7 @@ const Clubs: React.FC = () => {
         </button>
       </div>
 
-      {error && <div className="error">{error}</div>}
+      {error && <div className="error">{(error as Error).message}</div>}
 
       {showCreateForm && (
         <div className="card mb-2">
@@ -107,52 +103,25 @@ const Clubs: React.FC = () => {
           <form onSubmit={handleCreateClub}>
             <div className="form-group">
               <label>Club Name *</label>
-              <input
-                type="text"
-                className="form-control"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                required
-              />
+              <input type="text" className="form-control" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
             </div>
             <div className="form-group">
               <label>Description *</label>
-              <textarea
-                className="form-control"
-                value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                rows={3}
-                required
-              />
+              <textarea className="form-control" value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} rows={3} required />
             </div>
             <div className="form-group">
               <label>Zip Code *</label>
-              <input
-                type="text"
-                className="form-control"
-                value={formData.zip_code}
-                onChange={(e) => setFormData({...formData, zip_code: e.target.value})}
-                pattern="[0-9]{5}"
-                required
-              />
+              <input type="text" className="form-control" value={formData.zip_code} onChange={(e) => setFormData({...formData, zip_code: e.target.value})} pattern="[0-9]{5}" required />
             </div>
             <div className="form-group">
               <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={formData.is_public}
-                  onChange={(e) => setFormData({...formData, is_public: e.target.checked})}
-                  style={{ marginRight: '10px', width: '20px', height: '20px' }}
-                />
-                <span>
-                  <strong>Public Club</strong>
-                  <span style={{ display: 'block', fontSize: '0.9rem', color: '#666' }}>
-                    Public clubs are visible to all users. Private clubs are only visible to members.
-                  </span>
-                </span>
+                <input type="checkbox" checked={formData.is_public} onChange={(e) => setFormData({...formData, is_public: e.target.checked})} style={{ marginRight: '10px', width: '20px', height: '20px' }} />
+                <span><strong>Public Club</strong><span style={{ display: 'block', fontSize: '0.9rem', color: '#666' }}>Public clubs are visible to all users. Private clubs are only visible to members.</span></span>
               </label>
             </div>
-            <button type="submit" className="btn btn-primary">Create Club</button>
+            <button type="submit" className="btn btn-primary" disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Creating...' : 'Create Club'}
+            </button>
           </form>
         </div>
       )}
@@ -164,14 +133,11 @@ const Clubs: React.FC = () => {
         </div>
       ) : (
         <div className="grid">
-          {clubs.map((club) => (
+          {clubs.map((club: Club) => (
             <div key={club.id} className="card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
                 <h3 style={{ margin: 0 }}>{club.name}</h3>
-                <span 
-                  className={`badge badge-${club.is_public ? 'success' : 'warning'}`}
-                  style={{ fontSize: '0.75rem', padding: '3px 6px' }}
-                >
+                <span className={`badge badge-${club.is_public ? 'success' : 'warning'}`} style={{ fontSize: '0.75rem', padding: '3px 6px' }}>
                   {club.is_public ? '🌐 Public' : '🔒 Private'}
                 </span>
               </div>
@@ -193,32 +159,15 @@ const Clubs: React.FC = () => {
               )}
               
               <div className="flex mt-1">
-                <Link to={`/clubs/${club.id}`} className="btn btn-primary btn-sm">
-                  View Details
-                </Link>
+                <Link to={`/clubs/${club.id}`} className="btn btn-primary btn-sm">View Details</Link>
                 {!club.user_membership && (
-                  <button 
-                    className="btn btn-success btn-sm"
-                    onClick={() => handleJoinClub(club.id)}
-                  >
-                    Join Club
-                  </button>
+                  <button className="btn btn-success btn-sm" onClick={() => handleJoinClub(club.id)}>Join Club</button>
                 )}
                 {club.user_membership && club.user_membership.status === 'pending' && (
-                  <button 
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => handleCancelRequest(club.id)}
-                  >
-                    Cancel Request
-                  </button>
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleCancelRequest(club.id)}>Cancel Request</button>
                 )}
                 {club.user_membership && club.user_membership.status === 'removed' && (
-                  <button 
-                    className="btn btn-success btn-sm"
-                    onClick={() => handleRejoin(club.id)}
-                  >
-                    Request to Rejoin
-                  </button>
+                  <button className="btn btn-success btn-sm" onClick={() => handleRejoin(club.id)}>Request to Rejoin</button>
                 )}
               </div>
             </div>
