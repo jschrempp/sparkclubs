@@ -118,7 +118,8 @@ const ClubDetail: React.FC = () => {
   });
 
   const interestMutation = useMutation({
-    mutationFn: topicsAPI.expressInterest,
+    mutationFn: ({ topicId, interestType }: { topicId: number; interestType: string }) =>
+      topicsAPI.expressInterest(topicId, interestType),
     onSuccess: () => invalidateAll(),
     onError: (err: Error) => alert(err.message),
   });
@@ -377,7 +378,7 @@ const ClubDetail: React.FC = () => {
                       )}
                     </div>
                     <div style={{ marginTop: '10px' }}>
-                      <select className="form-control" style={{ width: 'auto' }} value={topic.user_interest || ''} onChange={(e) => { if (e.target.value) interestMutation.mutate(topic.id); }} title="Set my interest">
+                      <select className="form-control" style={{ width: 'auto' }} value={topic.user_interest || ''} onChange={(e) => { if (e.target.value) interestMutation.mutate({ topicId: topic.id, interestType: e.target.value }); }} title="Set my interest">
                         <option value="">My interest: none</option>
                         <option value="interested">👍 Interested</option>
                         <option value="able_to_lead">🎤 I can lead this discussion</option>

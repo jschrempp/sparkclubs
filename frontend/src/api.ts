@@ -238,8 +238,11 @@ export const topicsAPI = {
     }
   },
 
-  expressInterest: async (topicId: number) => {
-    const response = await apiFetch(`/topics/${topicId}/set_interest/`, { method: 'POST' });
+  expressInterest: async (topicId: number, interestType: string) => {
+    const response = await apiFetch(`/topics/${topicId}/set_interest/`, {
+      method: 'POST',
+      body: { interest_type: interestType },
+    });
     return handleResponse(response);
   },
 };
