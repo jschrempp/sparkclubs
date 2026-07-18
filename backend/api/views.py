@@ -1,16 +1,13 @@
 """API views for Spark Clubs application."""
-from datetime import datetime
-import json
-import csv
-import re
-from io import StringIO
+
+from typing import Any, Optional
+
 from django.conf import settings
-from django.db.models import Q, Count
-from django.http import HttpResponse
+from django.db.models import Q
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.contrib.auth import authenticate
-from rest_framework import viewsets, status, generics
+from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -18,11 +15,18 @@ from rest_framework.exceptions import ValidationError
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-from .models import User, Club, ClubMembership, Topic, TopicInterest, Event, EventTopic, EventAttendance, SystemSettings
+from .models import User, Club, ClubMembership, Topic, TopicInterest, Event, EventAttendance, SystemSettings
 from .serializers import (
-    UserSerializer, AdminUserSerializer, UserCreateSerializer, ClubSerializer, ClubMembershipSerializer,
-    TopicSerializer, TopicInterestSerializer, EventSerializer, EventTopicSerializer, EventAttendanceSerializer,
-    SystemSettingsSerializer
+    UserSerializer,
+    AdminUserSerializer,
+    UserCreateSerializer,
+    ClubSerializer,
+    ClubMembershipSerializer,
+    TopicSerializer,
+    TopicInterestSerializer,
+    EventSerializer,
+    EventAttendanceSerializer,
+    SystemSettingsSerializer,
 )
 from .permissions import IsSuperAdmin, IsSiteAdmin, IsMemberOrAdmin, IsClubAdmin, IsClubMember
 from .authentication import generate_token_pair, set_refresh_cookie, clear_refresh_cookie, REFRESH_COOKIE_NAME
@@ -30,172 +34,150 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
 
-def _validate_password_strength(password):
+def _validate_password_strength(password: str) -> Optional[str]:
     """Return an error string if password doesn't meet requirements, else None."""
     import re
+
     if len(password) < 8:
-        return 'Password must be at least 8 characters'
-    if not re.search(r'[A-Z]', password):
-        return 'Password must contain at least one uppercase letter'
-    if not re.search(r'[a-z]', password):
-        return 'Password must contain at least one lowercase letter'
-    if not re.search(r'\d', password):
-        return 'Password must contain at least one digit'
-    if not re.search(r'[^A-Za-z0-9]', password):
-        return 'Password must contain at least one special character'
+        return "Password must be at least 8 characters"
+    if not re.search(r"[A-Z]", password):
+        return "Password must contain at least one uppercase letter"
+    if not re.search(r"[a-z]", password):
+        return "Password must contain at least one lowercase letter"
+    if not re.search(r"\d", password):
+        return "Password must contain at least one digit"
+    if not re.search(r"[^A-Za-z0-9]", password):
+        return "Password must contain at least one special character"
     return None
 
 
 # Authentication Views
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
-def google_auth(request):
+def google_auth(request: HttpRequest) -> Response:
     """Handle Google OAuth authentication."""
     if not settings.USE_GOOGLE_OAUTH:
-        return Response(
-            {'error': 'Google OAuth is not enabled'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    token = request.data.get('token')
-    
+        return Response({"error": "Google OAuth is not enabled"}, status=status.HTTP_400_BAD_REQUEST)
+
+    token = request.data.get("token")
+
     if not token:
-        return Response({'error': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
-    
+        return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
         # Verify the Google token
-        idinfo = id_token.verify_oauth2_token(
-            token, google_requests.Request(), settings.GOOGLE_CLIENT_ID
-        )
-        
-        google_id = idinfo['sub']
-        email = idinfo['email']
-        
+        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), settings.GOOGLE_CLIENT_ID)
+
+        google_id = idinfo["sub"]
+        email = idinfo["email"]
+
         # Check if user exists
         user = User.objects.filter(Q(google_id=google_id) | Q(email=email)).first()
-        
+
         if user:
             # Update last login
             user.last_login = timezone.now()
             if not user.google_id:
                 user.google_id = google_id
             user.save()
-            
+
             # Issue a short-lived access token + HttpOnly refresh cookie
             access_token, refresh_token = generate_token_pair(user)
-            
-            response = Response({
-                'token': access_token,
-                'user': UserSerializer(user).data
-            })
+
+            response = Response({"token": access_token, "user": UserSerializer(user).data})
             set_refresh_cookie(response, refresh_token)
             return response
         else:
             # Return Google info for registration
-            return Response({
-                'needs_registration': True,
-                'google_id': google_id,
-                'email': email,
-            })
-    
+            return Response(
+                {
+                    "needs_registration": True,
+                    "google_id": google_id,
+                    "email": email,
+                }
+            )
+
     except ValueError as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
-def login(request):
+def login(request: HttpRequest) -> Response:
     """Handle traditional email/password login."""
     if settings.USE_GOOGLE_OAUTH:
         return Response(
-            {'error': 'Traditional login is not enabled. Please use Google OAuth.'},
-            status=status.HTTP_400_BAD_REQUEST
+            {"error": "Traditional login is not enabled. Please use Google OAuth."}, status=status.HTTP_400_BAD_REQUEST
         )
-    
-    email = request.data.get('email')
-    password = request.data.get('password')
-    
+
+    email = request.data.get("email")
+    password = request.data.get("password")
+
     if not email or not password:
-        return Response(
-            {'error': 'Email and password are required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
+        return Response({"error": "Email and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+
     # Authenticate user
     user = User.objects.filter(email__iexact=email).first()
-    
+
     if user and user.check_password(password):
         # Update last login
         user.last_login = timezone.now()
         user.save()
-        
+
         # Issue a short-lived access token + HttpOnly refresh cookie
         access_token, refresh_token = generate_token_pair(user)
-        
-        response = Response({
-            'token': access_token,
-            'user': UserSerializer(user).data
-        })
+
+        response = Response({"token": access_token, "user": UserSerializer(user).data})
         set_refresh_cookie(response, refresh_token)
         return response
-    
-    return Response(
-        {'error': 'Invalid email or password'},
-        status=status.HTTP_401_UNAUTHORIZED
-    )
+
+    return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
-def register(request):
+def register(request: HttpRequest) -> Response:
     """Register a new user."""
     serializer = UserCreateSerializer(data=request.data)
-    
+
     if serializer.is_valid():
         # Check if email already exists
-        if User.objects.filter(email=serializer.validated_data['email']).exists():
-            return Response(
-                {'error': 'A user with this email already exists'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Ensure password is provided when Google OAuth is disabled
-        if not settings.USE_GOOGLE_OAUTH and not serializer.validated_data.get('password'):
-            return Response(
-                {'error': 'Password is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if User.objects.filter(email=serializer.validated_data["email"]).exists():
+            return Response({"error": "A user with this email already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
-        password = serializer.validated_data.get('password')
+        # Ensure password is provided when Google OAuth is disabled
+        if not settings.USE_GOOGLE_OAUTH and not serializer.validated_data.get("password"):
+            return Response({"error": "Password is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        password = serializer.validated_data.get("password")
         if password:
             error = _validate_password_strength(password)
             if error:
-                return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
-        
+                return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+
         # Check if auto-approval is enabled
         system_settings = SystemSettings.get_settings()
         if system_settings.auto_approve_users:
             # Auto-approve: set user_type to member
-            user = serializer.save(user_type='member')
+            user = serializer.save(user_type="member")
         else:
             # Default: user remains pending
             user = serializer.save()
-        
+
         access_token, refresh_token = generate_token_pair(user)
-        
-        response = Response({
-            'token': access_token,
-            'user': UserSerializer(user).data
-        }, status=status.HTTP_201_CREATED)
+
+        response = Response({"token": access_token, "user": UserSerializer(user).data}, status=status.HTTP_201_CREATED)
         set_refresh_cookie(response, refresh_token)
         return response
-    
-    return Response({'error': 'Invalid registration data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(
+        {"error": "Invalid registration data", "details": serializer.errors}, status=status.HTTP_400_BAD_REQUEST
+    )
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
-def token_refresh(request):
+def token_refresh(request: HttpRequest) -> Response:
     """Issue a new access token using the HttpOnly refresh cookie.
 
     Also rotates the refresh token (single-use) per SIMPLE_JWT settings and
@@ -203,14 +185,14 @@ def token_refresh(request):
     """
     refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
     if not refresh_token:
-        return Response({'error': 'No refresh token provided'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({"error": "No refresh token provided"}, status=status.HTTP_401_UNAUTHORIZED)
 
     try:
         old_refresh = RefreshToken(refresh_token)
-        user_id = old_refresh['user_id']
+        user_id = old_refresh["user_id"]
         user = User.objects.get(id=user_id)
         if not user.is_active:
-            return Response({'error': 'User is inactive'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"error": "User is inactive"}, status=status.HTTP_401_UNAUTHORIZED)
 
         # Rotate: issue a brand new token pair, then blacklist the old refresh token (single-use)
         access_token, new_refresh_token = generate_token_pair(user)
@@ -219,16 +201,16 @@ def token_refresh(request):
         except AttributeError:
             pass
     except (TokenError, User.DoesNotExist) as e:
-        return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
 
-    response = Response({'token': access_token})
+    response = Response({"token": access_token})
     set_refresh_cookie(response, new_refresh_token)
     return response
 
 
-@api_view(['POST'])
+@api_view(["POST"])
 @permission_classes([AllowAny])
-def logout(request):
+def logout(request: HttpRequest) -> Response:
     """Blacklist the current refresh token and clear the cookie."""
     refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
     if refresh_token:
@@ -237,77 +219,67 @@ def logout(request):
         except (TokenError, AttributeError):
             pass
 
-    response = Response({'message': 'Logged out successfully'})
+    response = Response({"message": "Logged out successfully"})
     clear_refresh_cookie(response)
     return response
 
 
-@api_view(['GET'])
-def me(request):
+@api_view(["GET"])
+def me(request: HttpRequest) -> Response:
     """Get current user's profile."""
     return Response(UserSerializer(request.user).data)
 
 
-@api_view(['POST'])
-def change_password(request):
+@api_view(["POST"])
+def change_password(request: HttpRequest) -> Response:
     """Allow authenticated user to change their own password."""
-    current_password = request.data.get('current_password')
-    new_password = request.data.get('new_password')
+    current_password = request.data.get("current_password")
+    new_password = request.data.get("new_password")
 
     if not current_password or not new_password:
-        return Response(
-            {'error': 'current_password and new_password are required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({"error": "current_password and new_password are required"}, status=status.HTTP_400_BAD_REQUEST)
 
     if not request.user.check_password(current_password):
-        return Response(
-            {'error': 'Current password is incorrect'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({"error": "Current password is incorrect"}, status=status.HTTP_400_BAD_REQUEST)
 
     if len(new_password) < 8:
-        return Response(
-            {'error': 'New password must be at least 8 characters'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({"error": "New password must be at least 8 characters"}, status=status.HTTP_400_BAD_REQUEST)
 
     error = _validate_password_strength(new_password)
     if error:
-        return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
     request.user.set_password(new_password)
     request.user.save()
-    return Response({'message': 'Password changed successfully'})
+    return Response({"message": "Password changed successfully"})
 
 
-@api_view(['GET'])
-def my_memberships(request):
+@api_view(["GET"])
+def my_memberships(request: HttpRequest) -> Response:
     """Get current user's club memberships."""
-    memberships = ClubMembership.objects.filter(user=request.user).select_related('club')
+    memberships = ClubMembership.objects.filter(user=request.user).select_related("club")
     serializer = ClubMembershipSerializer(memberships, many=True)
     return Response(serializer.data)
 
 
-@api_view(['GET'])
-def my_events(request):
+@api_view(["GET"])
+def my_events(request: HttpRequest) -> Response:
     """Get events where the current user has RSVP'd 'attending'."""
     # Get user's attending events
-    attendances = EventAttendance.objects.filter(
-        user=request.user,
-        rsvp_status='attending'
-    ).select_related('event', 'event__club', 'event__host')
-    
+    attendances = EventAttendance.objects.filter(user=request.user, rsvp_status="attending").select_related(
+        "event", "event__club", "event__host"
+    )
+
     # Extract events and filter to future events only (optional)
     events = [attendance.event for attendance in attendances]
-    
+
     # Filter to future events (optional - you can remove this to show all events)
     now = timezone.now()
     events = [event for event in events if event.start_datetime >= now]
-    
+
     # Sort by start date (upcoming events first)
     events.sort(key=lambda e: e.start_datetime)
-    
+
     serializer = EventSerializer(events, many=True)
     return Response(serializer.data)
 
@@ -315,201 +287,186 @@ def my_events(request):
 # User Management Views
 class UserViewSet(viewsets.ModelViewSet):
     """ViewSet for User model."""
+
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    
-    def get_permissions(self):
-        if self.action in ['update_user_type', 'list']:
+
+    def get_permissions(self) -> list[Any]:
+        if self.action in ["update_user_type", "list"]:
             return [IsSiteAdmin()]
         return [IsAuthenticated()]
-    
-    def get_serializer_class(self):
+
+    def get_serializer_class(self) -> type:
         """Use AdminUserSerializer for admin list view."""
-        if self.action == 'list' and self.request.user.is_site_admin():
+        if self.action == "list" and self.request.user.is_site_admin():
             return AdminUserSerializer
         return UserSerializer
-    
-    def get_queryset(self):
+
+    def get_queryset(self) -> Any:
         """Filter users based on permissions and optimize queries."""
         user = self.request.user
-        
+
         if user.is_site_admin():
             # Optimize query with prefetch_related for memberships
-            if self.action == 'list':
-                return User.objects.prefetch_related(
-                    'memberships__club'
-                ).all()
+            if self.action == "list":
+                return User.objects.prefetch_related("memberships__club").all()
             return User.objects.all()
-        
+
         # Regular users can only see their own profile
         return User.objects.filter(id=user.id)
-    
-    @action(detail=True, methods=['post'], permission_classes=[IsSiteAdmin])
-    def update_user_type(self, request, pk=None):
+
+    @action(detail=True, methods=["post"], permission_classes=[IsSiteAdmin])
+    def update_user_type(self, request: HttpRequest, pk: Any = None) -> Response:
         """Update user type (site admin only)."""
         user = self.get_object()
-        new_type = request.data.get('user_type')
-        
+        new_type = request.data.get("user_type")
+
         if not new_type or new_type not in dict(User.USER_TYPE_CHOICES):
-            return Response(
-                {'error': 'Invalid user type'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+            return Response({"error": "Invalid user type"}, status=status.HTTP_400_BAD_REQUEST)
+
         # Site admins cannot modify super admins
-        if user.user_type == 'super_admin' and not request.user.is_super_admin():
-            return Response(
-                {'error': 'Cannot modify super admin'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
+        if user.user_type == "super_admin" and not request.user.is_super_admin():
+            return Response({"error": "Cannot modify super admin"}, status=status.HTTP_403_FORBIDDEN)
+
         # Users cannot change their own type
         if user.id == request.user.id:
-            return Response(
-                {'error': 'Cannot change your own user type'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
+            return Response({"error": "Cannot change your own user type"}, status=status.HTTP_403_FORBIDDEN)
+
         # Only super admins can promote to super admin
-        if new_type == 'super_admin' and not request.user.is_super_admin():
-            return Response(
-                {'error': 'Only super admins can promote to super admin'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
+        if new_type == "super_admin" and not request.user.is_super_admin():
+            return Response({"error": "Only super admins can promote to super admin"}, status=status.HTTP_403_FORBIDDEN)
+
         user.user_type = new_type
         user.save()
-        
+
         return Response(UserSerializer(user).data)
-    
-    @action(detail=True, methods=['post'], permission_classes=[IsSiteAdmin])
-    def increase_club_limit(self, request, pk=None):
+
+    @action(detail=True, methods=["post"], permission_classes=[IsSiteAdmin])
+    def increase_club_limit(self, request: HttpRequest, pk: Any = None) -> Response:
         """Increase a user's club creation limit by 5 (site admin only)."""
         user = self.get_object()
-        
+
         # Increase limit by 5
         user.club_creation_limit += 5
         user.save()
-        
-        return Response({
-            'message': f'Club creation limit increased to {user.club_creation_limit}',
-            'club_creation_limit': user.club_creation_limit
-        })
+
+        return Response(
+            {
+                "message": f"Club creation limit increased to {user.club_creation_limit}",
+                "club_creation_limit": user.club_creation_limit,
+            }
+        )
 
 
 # Club Management Views
 class ClubViewSet(viewsets.ModelViewSet):
     """ViewSet for Club model."""
+
     queryset = Club.objects.all()
     serializer_class = ClubSerializer
-    
-    def get_queryset(self):
+
+    def get_queryset(self) -> Any:
         """Filter clubs based on permissions and visibility."""
         user = self.request.user
-        
+
         # Site admins can see all clubs (active and inactive, public and private)
         if user.is_site_admin():
             return Club.objects.all()
-        
+
         # Regular members can see:
         # 1. All public active clubs
         # 2. Private clubs where they are a member
         active_clubs = Club.objects.filter(is_active=True)
-        
+
         # Get public clubs
         public_clubs = active_clubs.filter(is_public=True)
-        
+
         # Get private clubs where user is a member
         private_member_clubs = active_clubs.filter(
-            is_public=False,
-            memberships__user=user,
-            memberships__status='active'
+            is_public=False, memberships__user=user, memberships__status="active"
         )
-        
+
         # Combine both querysets
         return (public_clubs | private_member_clubs).distinct()
-    
-    def get_permissions(self):
-        if self.action in ['create']:
+
+    def get_permissions(self) -> list[Any]:
+        if self.action in ["create"]:
             return [IsAuthenticated()]
-        elif self.action in ['destroy']:
+        elif self.action in ["destroy"]:
             return [IsSuperAdmin()]
-        elif self.action in ['update', 'partial_update']:
+        elif self.action in ["update", "partial_update"]:
             return [IsClubAdmin()]
         return [IsMemberOrAdmin()]
-    
-    def perform_create(self, serializer):
+
+    def perform_create(self, serializer: ClubSerializer) -> None:
         """Set created_by when creating a club and validate creation limit."""
         user = self.request.user
-        
+
         # Check for duplicate club name
-        club_name = serializer.validated_data.get('name')
+        club_name = serializer.validated_data.get("name")
         if Club.objects.filter(name__iexact=club_name).exists():
-            raise ValidationError({
-                'name': f'A club with the name "{club_name}" already exists. Please choose a different name.'
-            })
-        
+            raise ValidationError(
+                {"name": f'A club with the name "{club_name}" already exists. Please choose a different name.'}
+            )
+
         # Site admins and super admins have no limit
         if not user.is_site_admin():
             # Check how many clubs this user has created
             created_count = Club.objects.filter(created_by=user).count()
             limit = user.club_creation_limit
             if created_count >= limit:
-                raise ValidationError({
-                    'error': f'You have reached your maximum limit of {limit} clubs. '
-                             'You cannot create more clubs. Contact a site administrator to increase your limit.'
-                })
-        
+                raise ValidationError(
+                    {
+                        "error": f"You have reached your maximum limit of {limit} clubs. "
+                        "You cannot create more clubs. Contact a site administrator to increase your limit."
+                    }
+                )
+
         # Save the club
         club = serializer.save(created_by=user)
-        
+
         # Automatically add creator as admin member
-        ClubMembership.objects.create(
-            club=club,
-            user=user,
-            status='active',
-            is_admin=True
-        )
-    
-    def perform_update(self, serializer):
+        ClubMembership.objects.create(club=club, user=user, status="active", is_admin=True)
+
+    def perform_update(self, serializer: ClubSerializer) -> None:
         """Validate club name uniqueness when updating."""
-        club_name = serializer.validated_data.get('name')
+        club_name = serializer.validated_data.get("name")
         club_instance = self.get_object()
-        
+
         # Check if the new name conflicts with another club
         if club_name and Club.objects.filter(name__iexact=club_name).exclude(id=club_instance.id).exists():
-            raise ValidationError({
-                'name': f'A club with the name "{club_name}" already exists. Please choose a different name.'
-            })
-        
+            raise ValidationError(
+                {"name": f'A club with the name "{club_name}" already exists. Please choose a different name.'}
+            )
+
         serializer.save()
-    
-    @action(detail=True, methods=['get'])
-    def members(self, request, pk=None):
+
+    @action(detail=True, methods=["get"])
+    def members(self, request: HttpRequest, pk: Any = None) -> Response:
         """Get club members."""
         club = self.get_object()
-        
+
         # Check permissions
         if not request.user.is_club_admin(club):
             # Regular members can only see active members
-            memberships = club.memberships.filter(status='active')
+            memberships = club.memberships.filter(status="active")
         else:
             # Admins can see all members
             memberships = club.memberships.all()
-        
+
         serializer = ClubMembershipSerializer(memberships, many=True)
         return Response(serializer.data)
-    
-    @action(detail=True, methods=['post'])
-    def join(self, request, pk=None):
+
+    @action(detail=True, methods=["post"])
+    def join(self, request: HttpRequest, pk: Any = None) -> Response:
         """Request to join a club."""
         club = self.get_object()
         return self._create_or_reactivate_membership(request, club)
-    
-    @action(detail=False, methods=['post'], url_path='join-by-token/(?P<token>[^/]+)')
-    def join_by_token(self, request, token=None):
+
+    @action(detail=False, methods=["post"], url_path="join-by-token/(?P<token>[^/]+)")
+    def join_by_token(self, request: HttpRequest, token: Optional[str] = None) -> Response:
         """Request to join a club via its private invite token (from an invite link).
-        
+
         Uses an opaque token instead of the numeric club id so invite links
         can't be guessed/enumerated, and works for private clubs too. Treats
         an existing membership as success (idempotent) so the caller always
@@ -517,374 +474,314 @@ class ClubViewSet(viewsets.ModelViewSet):
         """
         club = get_object_or_404(Club, invite_token=token, is_active=True)
         return self._create_or_reactivate_membership(request, club, idempotent=True)
-    
-    def _create_or_reactivate_membership(self, request, club, idempotent=False):
+
+    def _create_or_reactivate_membership(self, request: HttpRequest, club: Club, idempotent: bool = False) -> Response:
         """Shared logic for join / join_by_token."""
         # Check if already a member
         existing = ClubMembership.objects.filter(club=club, user=request.user).first()
         if existing:
             # If the membership was removed, allow them to rejoin by creating a new pending request
-            if existing.status == 'removed':
+            if existing.status == "removed":
                 # Check if auto-approval is enabled
                 system_settings = SystemSettings.get_settings()
-                existing.status = 'active' if system_settings.auto_approve_club_memberships else 'pending'
+                existing.status = "active" if system_settings.auto_approve_club_memberships else "pending"
                 existing.save()
-                return Response(
-                    ClubMembershipSerializer(existing).data,
-                    status=status.HTTP_200_OK
-                )
+                return Response(ClubMembershipSerializer(existing).data, status=status.HTTP_200_OK)
             elif idempotent:
                 # Invite links are safe to reuse - just return the existing membership
-                return Response(
-                    ClubMembershipSerializer(existing).data,
-                    status=status.HTTP_200_OK
-                )
+                return Response(ClubMembershipSerializer(existing).data, status=status.HTTP_200_OK)
             else:
                 return Response(
-                    {'error': 'Already a member or have a pending request'},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"error": "Already a member or have a pending request"}, status=status.HTTP_400_BAD_REQUEST
                 )
-        
+
         # Check if auto-approval is enabled
         system_settings = SystemSettings.get_settings()
-        membership_status = 'active' if system_settings.auto_approve_club_memberships else 'pending'
-        
-        membership = ClubMembership.objects.create(
-            club=club,
-            user=request.user,
-            status=membership_status
-        )
-        
-        return Response(
-            ClubMembershipSerializer(membership).data,
-            status=status.HTTP_201_CREATED
-        )
-    
-    @action(detail=True, methods=['post'])
-    def leave(self, request, pk=None):
+        membership_status = "active" if system_settings.auto_approve_club_memberships else "pending"
+
+        membership = ClubMembership.objects.create(club=club, user=request.user, status=membership_status)
+
+        return Response(ClubMembershipSerializer(membership).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"])
+    def leave(self, request: HttpRequest, pk: Any = None) -> Response:
         """Leave a club."""
         club = self.get_object()
-        
-        membership = ClubMembership.objects.filter(
-            club=club, user=request.user
-        ).first()
-        
+
+        membership = ClubMembership.objects.filter(club=club, user=request.user).first()
+
         if not membership:
-            return Response(
-                {'error': 'Not a member of this club'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        membership.status = 'removed'
+            return Response({"error": "Not a member of this club"}, status=status.HTTP_400_BAD_REQUEST)
+
+        membership.status = "removed"
         membership.save()
-        
-        return Response({'message': 'Successfully left the club'})
+
+        return Response({"message": "Successfully left the club"})
 
 
 class ClubMembershipViewSet(viewsets.ModelViewSet):
     """ViewSet for ClubMembership model."""
+
     queryset = ClubMembership.objects.all()
     serializer_class = ClubMembershipSerializer
     permission_classes = [IsClubAdmin]
-    
-    @action(detail=True, methods=['post'])
-    def approve(self, request, pk=None):
+
+    @action(detail=True, methods=["post"])
+    def approve(self, request: HttpRequest, pk: Any = None) -> Response:
         """Approve a pending membership."""
         membership = self.get_object()
-        
-        if membership.status != 'pending':
-            return Response(
-                {'error': 'Membership is not pending'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        membership.status = 'active'
+
+        if membership.status != "pending":
+            return Response({"error": "Membership is not pending"}, status=status.HTTP_400_BAD_REQUEST)
+
+        membership.status = "active"
         membership.save()
-        
+
         return Response(ClubMembershipSerializer(membership).data)
-    
-    @action(detail=True, methods=['post'])
-    def remove(self, request, pk=None):
+
+    @action(detail=True, methods=["post"])
+    def remove(self, request: HttpRequest, pk: Any = None) -> Response:
         """Remove a member from the club."""
         membership = self.get_object()
-        membership.status = 'removed'
+        membership.status = "removed"
         membership.save()
-        
+
         return Response(ClubMembershipSerializer(membership).data)
-    
-    @action(detail=True, methods=['post'])
-    def set_admin(self, request, pk=None):
+
+    @action(detail=True, methods=["post"])
+    def set_admin(self, request: HttpRequest, pk: Any = None) -> Response:
         """Set or unset club admin status."""
         membership = self.get_object()
-        is_admin = request.data.get('is_admin', False)
-        
+        is_admin = request.data.get("is_admin", False)
+
         membership.is_admin = is_admin
         membership.save()
-        
+
         return Response(ClubMembershipSerializer(membership).data)
-    
-    @action(detail=True, methods=['post'])
-    def set_host_order(self, request, pk=None):
+
+    @action(detail=True, methods=["post"])
+    def set_host_order(self, request: HttpRequest, pk: Any = None) -> Response:
         """Set host rotation order."""
         membership = self.get_object()
-        host_order = request.data.get('host_order')
-        
+        host_order = request.data.get("host_order")
+
         membership.host_order = host_order
         membership.save()
-        
+
         return Response(ClubMembershipSerializer(membership).data)
 
 
 # Topic Management Views
 class TopicViewSet(viewsets.ModelViewSet):
     """ViewSet for Topic model."""
+
     queryset = Topic.objects.all()
     serializer_class = TopicSerializer
-    
-    def get_permissions(self):
-        if self.action in ['create']:
+
+    def get_permissions(self) -> list[Any]:
+        if self.action in ["create"]:
             return [IsClubMember()]
-        elif self.action in ['update', 'partial_update', 'destroy']:
+        elif self.action in ["update", "partial_update", "destroy"]:
             return [IsClubAdmin()]
         return [IsAuthenticated()]
-    
-    def get_queryset(self):
+
+    def get_queryset(self) -> Any:
         """Filter topics based on permissions and club."""
         user = self.request.user
-        club_id = self.request.query_params.get('club')
-        
+        club_id = self.request.query_params.get("club")
+
         queryset = Topic.objects.all()
-        
+
         if club_id:
             queryset = queryset.filter(club_id=club_id)
-        
+
         # Non-admins can only see active/inactive topics
         if not user.is_site_admin():
             # Check which clubs user is admin of
-            admin_clubs = ClubMembership.objects.filter(
-                user=user, is_admin=True, status='active'
-            ).values_list('club_id', flat=True)
-            
+            admin_clubs = ClubMembership.objects.filter(user=user, is_admin=True, status="active").values_list(
+                "club_id", flat=True
+            )
+
             # Show all topics in clubs where user is admin
             # Show only active/inactive in other clubs
-            queryset = queryset.filter(
-                Q(club_id__in=admin_clubs) |
-                Q(status__in=['active', 'inactive'])
-            )
-        
+            queryset = queryset.filter(Q(club_id__in=admin_clubs) | Q(status__in=["active", "inactive"]))
+
         return queryset
-    
-    def perform_create(self, serializer):
+
+    def perform_create(self, serializer: TopicSerializer) -> None:
         """Set created_by when creating a topic."""
         # Check if title already exists in club
-        club = serializer.validated_data['club']
-        title = serializer.validated_data['title']
-        
+        club = serializer.validated_data["club"]
+        title = serializer.validated_data["title"]
+
         if Topic.objects.filter(club=club, title__iexact=title).exists():
-            raise ValidationError({
-                'title': 'A topic with this title already exists in this club'
-            })
-        
+            raise ValidationError({"title": "A topic with this title already exists in this club"})
+
         # Auto-approve if club has auto-approve enabled
         if club.auto_approve_topics:
-            serializer.validated_data['status'] = 'active'
-        
+            serializer.validated_data["status"] = "active"
+
         # Save the club topic
         serializer.save(created_by=self.request.user)
-    
-    @action(detail=True, methods=['post'])
-    def set_interest(self, request, pk=None):
+
+    @action(detail=True, methods=["post"])
+    def set_interest(self, request: HttpRequest, pk: Any = None) -> Response:
         """Set or update user's interest in a topic."""
         topic = self.get_object()
-        interest_type = request.data.get('interest_type')
-        
+        interest_type = request.data.get("interest_type")
+
         if not interest_type:
+            return Response({"error": "interest_type is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if interest_type not in ["interested", "able_to_lead", "not_interested", "unspecified"]:
             return Response(
-                {'error': 'interest_type is required'},
-                status=status.HTTP_400_BAD_REQUEST
+                {"error": "Invalid interest type. Must be: interested, able_to_lead, not_interested, or unspecified"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        
-        if interest_type not in ['interested', 'able_to_lead', 'not_interested', 'unspecified']:
-            return Response(
-                {'error': 'Invalid interest type. Must be: interested, able_to_lead, not_interested, or unspecified'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+
         # Check if user is member of the club
-        if not ClubMembership.objects.filter(
-            club=topic.club, user=request.user, status='active'
-        ).exists():
-            return Response(
-                {'error': 'Not a member of this club'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
+        if not ClubMembership.objects.filter(club=topic.club, user=request.user, status="active").exists():
+            return Response({"error": "Not a member of this club"}, status=status.HTTP_403_FORBIDDEN)
+
         # Update or create the interest - user can only have one interest type per topic
         interest, created = TopicInterest.objects.update_or_create(
-            topic=topic,
-            user=request.user,
-            defaults={'interest_type': interest_type}
+            topic=topic, user=request.user, defaults={"interest_type": interest_type}
         )
-        
-        return Response({
-            'interest': TopicInterestSerializer(interest).data,
-            'created': created,
-            'message': 'Interest updated successfully' if not created else 'Interest set successfully'
-        })
-    
-    @action(detail=True, methods=['delete', 'post'])
-    def remove_interest(self, request, pk=None):
+
+        return Response(
+            {
+                "interest": TopicInterestSerializer(interest).data,
+                "created": created,
+                "message": "Interest updated successfully" if not created else "Interest set successfully",
+            }
+        )
+
+    @action(detail=True, methods=["delete", "post"])
+    def remove_interest(self, request: HttpRequest, pk: Any = None) -> Response:
         """Remove user's interest in a topic."""
         topic = self.get_object()
-        
-        deleted_count, _ = TopicInterest.objects.filter(
-            topic=topic,
-            user=request.user
-        ).delete()
-        
+
+        deleted_count, _ = TopicInterest.objects.filter(topic=topic, user=request.user).delete()
+
         if deleted_count == 0:
-            return Response(
-                {'message': 'No interest to remove'},
-                status=status.HTTP_200_OK
-            )
-        
-        return Response({'message': 'Interest removed successfully'})
-    
-    @action(detail=True, methods=['get'])
-    def interested_users(self, request, pk=None):
+            return Response({"message": "No interest to remove"}, status=status.HTTP_200_OK)
+
+        return Response({"message": "Interest removed successfully"})
+
+    @action(detail=True, methods=["get"])
+    def interested_users(self, request: HttpRequest, pk: Any = None) -> Response:
         """Get users interested in a topic (admin only)."""
         topic = self.get_object()
-        
+
         if not request.user.is_club_admin(topic.club):
-            return Response(
-                {'error': 'Permission denied'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
+            return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+
         interests = topic.interests.all()
         serializer = TopicInterestSerializer(interests, many=True)
         return Response(serializer.data)
 
 
-# Event Management Views  
+# Event Management Views
 class EventViewSet(viewsets.ModelViewSet):
     """ViewSet for Event model."""
+
     queryset = Event.objects.all()
     serializer_class = EventSerializer
-    
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update']:
+
+    def get_permissions(self) -> list[Any]:
+        if self.action in ["create", "update", "partial_update"]:
             return [IsClubAdmin()]
         return [IsClubMember()]
-    
-    def get_queryset(self):
+
+    def get_queryset(self) -> Any:
         """Filter events based on club."""
-        club_id = self.request.query_params.get('club')
-        status_filter = self.request.query_params.get('status', 'active')
-        
+        club_id = self.request.query_params.get("club")
+        status_filter = self.request.query_params.get("status", "active")
+
         queryset = Event.objects.all()
-        
+
         if club_id:
             queryset = queryset.filter(club_id=club_id)
-        
+
         if status_filter:
             queryset = queryset.filter(status=status_filter)
-        
+
         return queryset
-    
+
     def get_serializer_context(self):
         """Add request to serializer context."""
         context = super().get_serializer_context()
-        context['request'] = self.request
+        context["request"] = self.request
         return context
-    
-    def perform_create(self, serializer):
+
+    def perform_create(self, serializer: EventSerializer) -> None:
         """Set created_by when creating an event."""
         serializer.save(created_by=self.request.user)
-    
-    @action(detail=True, methods=['post'])
-    def rsvp(self, request, pk=None):
+
+    @action(detail=True, methods=["post"])
+    def rsvp(self, request: HttpRequest, pk: Any = None) -> Response:
         """RSVP to an event."""
         event = self.get_object()
-        rsvp_status = request.data.get('rsvp_status', 'attending')
-        
+        rsvp_status = request.data.get("rsvp_status", "attending")
+
         # Check if event is in the future
         if event.start_datetime < timezone.now():
-            return Response(
-                {'error': 'Cannot RSVP to past events'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
+            return Response({"error": "Cannot RSVP to past events"}, status=status.HTTP_400_BAD_REQUEST)
+
         # Check if user is member of the club
-        if not ClubMembership.objects.filter(
-            club=event.club, user=request.user, status='active'
-        ).exists():
-            return Response(
-                {'error': 'Not a member of this club'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
+        if not ClubMembership.objects.filter(club=event.club, user=request.user, status="active").exists():
+            return Response({"error": "Not a member of this club"}, status=status.HTTP_403_FORBIDDEN)
+
         attendance, created = EventAttendance.objects.update_or_create(
-            event=event,
-            user=request.user,
-            defaults={'rsvp_status': rsvp_status}
+            event=event, user=request.user, defaults={"rsvp_status": rsvp_status}
         )
-        
+
         return Response(EventAttendanceSerializer(attendance).data)
-    
-    @action(detail=True, methods=['delete'])
-    def cancel_rsvp(self, request, pk=None):
+
+    @action(detail=True, methods=["delete"])
+    def cancel_rsvp(self, request: HttpRequest, pk: Any = None) -> Response:
         """Cancel RSVP to an event."""
         event = self.get_object()
-        
-        EventAttendance.objects.filter(
-            event=event,
-            user=request.user
-        ).delete()
-        
-        return Response({'message': 'RSVP cancelled'})
-    
-    @action(detail=True, methods=['get'])
-    def attendees(self, request, pk=None):
+
+        EventAttendance.objects.filter(event=event, user=request.user).delete()
+
+        return Response({"message": "RSVP cancelled"})
+
+    @action(detail=True, methods=["get"])
+    def attendees(self, request: HttpRequest, pk: Any = None) -> Response:
         """Get event attendees."""
         event = self.get_object()
-        
-        attendances = event.attendances.filter(rsvp_status='attending')
+
+        attendances = event.attendances.filter(rsvp_status="attending")
         serializer = EventAttendanceSerializer(attendances, many=True)
         return Response(serializer.data)
 
 
 # System Settings Views
-@api_view(['GET'])
+@api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def get_system_settings(request):
+def get_system_settings(request: HttpRequest) -> Response:
     """Get system settings (super admin only)."""
-    if request.user.user_type != 'super_admin':
-        return Response(
-            {'error': 'Permission denied. Super admin access required.'},
-            status=status.HTTP_403_FORBIDDEN
-        )
-    
+    if request.user.user_type != "super_admin":
+        return Response({"error": "Permission denied. Super admin access required."}, status=status.HTTP_403_FORBIDDEN)
+
     settings_obj = SystemSettings.get_settings()
     serializer = SystemSettingsSerializer(settings_obj)
     return Response(serializer.data)
 
 
-@api_view(['PATCH'])
+@api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
-def update_system_settings(request):
+def update_system_settings(request: HttpRequest) -> Response:
     """Update system settings (super admin only)."""
-    if request.user.user_type != 'super_admin':
-        return Response(
-            {'error': 'Permission denied. Super admin access required.'},
-            status=status.HTTP_403_FORBIDDEN
-        )
-    
+    if request.user.user_type != "super_admin":
+        return Response({"error": "Permission denied. Super admin access required."}, status=status.HTTP_403_FORBIDDEN)
+
     settings_obj = SystemSettings.get_settings()
     serializer = SystemSettingsSerializer(settings_obj, data=request.data, partial=True)
-    
+
     if serializer.is_valid():
         serializer.save(updated_by=request.user)
         return Response(serializer.data)
-    
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

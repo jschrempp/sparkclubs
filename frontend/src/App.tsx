@@ -17,17 +17,17 @@ import './index.css';
 
 const queryClient = new QueryClient();
 
-function PrivateRoute({ children }: { children: ReactNode }) {
+const PrivateRoute = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated } = useAuth();
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
-}
+};
 
-function AdminRoute({ children }: { children: ReactNode }) {
+const AdminRoute = ({ children }: { children: ReactNode }) => {
   const { isSiteAdmin } = useAuth();
   return isSiteAdmin ? <>{children}</> : <Navigate to="/dashboard" />;
-}
+};
 
-function AppRoutes() {
+const AppRoutes = () => {
   const { isAuthenticated } = useAuth();
 
   return (
@@ -100,7 +100,7 @@ function AppRoutes() {
   );
 }
 
-function App() {
+const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <Router>
