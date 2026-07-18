@@ -55,6 +55,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'api',
 ]
@@ -172,7 +174,7 @@ AUTH_USER_MODEL = 'api.User'
 # REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'api.authentication.JWTAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -214,10 +216,16 @@ GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CLIENT_SECRET = env('GOOGLE_CLIENT_SECRET', default='')
 GOOGLE_REDIRECT_URI = env('GOOGLE_REDIRECT_URI', default='http://localhost:8000/api/auth/google/callback')
 
-# JWT Settings
-JWT_SECRET_KEY = env('JWT_SECRET_KEY', default=SECRET_KEY)
-JWT_ALGORITHM = env('JWT_ALGORITHM', default='HS256')
-JWT_EXPIRATION_DELTA = timedelta(hours=env.int('JWT_EXPIRATION_HOURS', default=24))
+# JWT Settings (djangorestframework-simplejwt)
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_USER_CLASS': 'api.User',
+}
 
 # Frontend URL
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')

@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect, type ReactNode } from 'react';
 import { authAPI } from './api';
-import { getToken, setToken, clearToken } from './tokenStore';
+import { setToken, clearToken } from './tokenStore';
 
 interface User {
   id: number;
@@ -43,17 +43,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = getToken();
-    if (token) {
-      authAPI.me()
-        .then(setUser)
-        .catch(() => {
-          clearToken();
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    // On app load there is no in-memory access token yet (it doesn't survive
+    // a page reload by design). Attempt a silent refresh using the HttpOnly
+    // refresh cookie to see if the user already has an active session.
+    let cancelled = false;
+
+    (async () => {
+      const result = await authAPI.refresh();
+      if (cancelled) return;
+
+      if (!result) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const userData = await authAPI.me();
+        if (!cancelled) setUser(userData);
+      } catch {
+        clearToken();
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = (token: string, userData: User) => {
@@ -62,8 +78,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = () => {
-    clearToken();
-    setUser(null);
+    authAPI.logout().finally(() => {
+      clearToken();
+      setUser(null);
+    });
   };
 
   const updateUser = (userData: User) => {

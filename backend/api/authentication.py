@@ -1,59 +1,41 @@
-"""Custom JWT authentication for the API."""
-import jwt
-from datetime import datetime, timedelta
+"""JWT helpers built on djangorestframework-simplejwt.
+
+Access tokens are short-lived and returned in the JSON response body so the
+frontend can hold them in memory. Refresh tokens are long-lived and are
+never exposed in a JSON body - they are only ever set/read via an HttpOnly,
+Secure, SameSite=Strict cookie, and are rotated (single-use) on every
+refresh per SIMPLE_JWT settings.
+"""
+from typing import Tuple
+
 from django.conf import settings
-from rest_framework import authentication, exceptions
+from rest_framework_simplejwt.tokens import RefreshToken
+
 from .models import User
 
-
-class JWTAuthentication(authentication.BaseAuthentication):
-    """JWT token authentication."""
-    
-    def authenticate(self, request):
-        """Authenticate request using JWT token."""
-        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
-        
-        if not auth_header.startswith('Bearer '):
-            return None
-        
-        token = auth_header.split(' ')[1]
-        
-        try:
-            payload = jwt.decode(
-                token,
-                settings.JWT_SECRET_KEY,
-                algorithms=[settings.JWT_ALGORITHM]
-            )
-        except jwt.ExpiredSignatureError:
-            raise exceptions.AuthenticationFailed('Token has expired')
-        except jwt.InvalidTokenError:
-            raise exceptions.AuthenticationFailed('Invalid token')
-        
-        try:
-            user = User.objects.get(id=payload['user_id'])
-        except User.DoesNotExist:
-            raise exceptions.AuthenticationFailed('User not found')
-        
-        if not user.is_active:
-            raise exceptions.AuthenticationFailed('User is inactive')
-        
-        return (user, token)
+REFRESH_COOKIE_NAME = 'refresh_token'
+REFRESH_COOKIE_PATH = '/api/auth/'
 
 
-def generate_jwt_token(user):
-    """Generate JWT token for user."""
-    payload = {
-        'user_id': user.id,
-        'email': user.email,
-        'user_type': user.user_type,
-        'exp': datetime.utcnow() + settings.JWT_EXPIRATION_DELTA,
-        'iat': datetime.utcnow(),
-    }
-    
-    token = jwt.encode(
-        payload,
-        settings.JWT_SECRET_KEY,
-        algorithm=settings.JWT_ALGORITHM
+def generate_token_pair(user: User) -> Tuple[str, str]:
+    """Return (access_token, refresh_token) strings for the given user."""
+    refresh = RefreshToken.for_user(user)
+    return str(refresh.access_token), str(refresh)
+
+
+def set_refresh_cookie(response, refresh_token: str) -> None:
+    """Attach the refresh token to the response as an HttpOnly cookie."""
+    response.set_cookie(
+        REFRESH_COOKIE_NAME,
+        refresh_token,
+        max_age=int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()),
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite='Strict',
+        path=REFRESH_COOKIE_PATH,
     )
-    
-    return token
+
+
+def clear_refresh_cookie(response) -> None:
+    """Remove the refresh token cookie (used on logout)."""
+    response.delete_cookie(REFRESH_COOKIE_NAME, path=REFRESH_COOKIE_PATH)

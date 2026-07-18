@@ -25,7 +25,9 @@ from .serializers import (
     SystemSettingsSerializer
 )
 from .permissions import IsSuperAdmin, IsSiteAdmin, IsMemberOrAdmin, IsClubAdmin, IsClubMember
-from .authentication import generate_jwt_token
+from .authentication import generate_token_pair, set_refresh_cookie, clear_refresh_cookie, REFRESH_COOKIE_NAME
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 
 
 def _validate_password_strength(password):
@@ -79,13 +81,15 @@ def google_auth(request):
                 user.google_id = google_id
             user.save()
             
-            # Generate JWT token
-            jwt_token = generate_jwt_token(user)
+            # Issue a short-lived access token + HttpOnly refresh cookie
+            access_token, refresh_token = generate_token_pair(user)
             
-            return Response({
-                'token': jwt_token,
+            response = Response({
+                'token': access_token,
                 'user': UserSerializer(user).data
             })
+            set_refresh_cookie(response, refresh_token)
+            return response
         else:
             # Return Google info for registration
             return Response({
@@ -125,13 +129,15 @@ def login(request):
         user.last_login = timezone.now()
         user.save()
         
-        # Generate JWT token
-        jwt_token = generate_jwt_token(user)
+        # Issue a short-lived access token + HttpOnly refresh cookie
+        access_token, refresh_token = generate_token_pair(user)
         
-        return Response({
-            'token': jwt_token,
+        response = Response({
+            'token': access_token,
             'user': UserSerializer(user).data
         })
+        set_refresh_cookie(response, refresh_token)
+        return response
     
     return Response(
         {'error': 'Invalid email or password'},
@@ -175,14 +181,65 @@ def register(request):
             # Default: user remains pending
             user = serializer.save()
         
-        jwt_token = generate_jwt_token(user)
+        access_token, refresh_token = generate_token_pair(user)
         
-        return Response({
-            'token': jwt_token,
+        response = Response({
+            'token': access_token,
             'user': UserSerializer(user).data
         }, status=status.HTTP_201_CREATED)
+        set_refresh_cookie(response, refresh_token)
+        return response
     
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    return Response({'error': 'Invalid registration data', 'details': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def token_refresh(request):
+    """Issue a new access token using the HttpOnly refresh cookie.
+
+    Also rotates the refresh token (single-use) per SIMPLE_JWT settings and
+    resets the HttpOnly cookie with the new refresh token.
+    """
+    refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+    if not refresh_token:
+        return Response({'error': 'No refresh token provided'}, status=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        old_refresh = RefreshToken(refresh_token)
+        user_id = old_refresh['user_id']
+        user = User.objects.get(id=user_id)
+        if not user.is_active:
+            return Response({'error': 'User is inactive'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # Rotate: issue a brand new token pair, then blacklist the old refresh token (single-use)
+        access_token, new_refresh_token = generate_token_pair(user)
+        try:
+            old_refresh.blacklist()
+        except AttributeError:
+            pass
+    except (TokenError, User.DoesNotExist) as e:
+        return Response({'error': str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+    response = Response({'token': access_token})
+    set_refresh_cookie(response, new_refresh_token)
+    return response
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def logout(request):
+    """Blacklist the current refresh token and clear the cookie."""
+    refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+    if refresh_token:
+        try:
+            RefreshToken(refresh_token).blacklist()
+        except (TokenError, AttributeError):
+            pass
+
+    response = Response({'message': 'Logged out successfully'})
+    clear_refresh_cookie(response)
+    return response
 
 
 @api_view(['GET'])
