@@ -13,18 +13,17 @@ router.register(r"events", views.EventViewSet, basename="event")
 
 urlpatterns = [
     # Authentication
-    path("auth/google/", views.google_auth, name="google-auth"),
-    path("auth/login/", views.login, name="login"),
-    path("auth/register/", views.register, name="register"),
-    path("auth/refresh/", views.token_refresh, name="token-refresh"),
-    path("auth/logout/", views.logout, name="logout"),
-    path("auth/me/", views.me, name="me"),
-    path("auth/change-password/", views.change_password, name="change-password"),
-    path("auth/my-memberships/", views.my_memberships, name="my-memberships"),
-    path("auth/my-events/", views.my_events, name="my-events"),
+    path("auth/google/", views.GoogleAuthView.as_view(), name="google-auth"),
+    path("auth/login/", views.LoginView.as_view(), name="login"),
+    path("auth/register/", views.RegisterView.as_view(), name="register"),
+    path("auth/refresh/", views.TokenRefreshView.as_view(), name="token-refresh"),
+    path("auth/logout/", views.LogoutView.as_view(), name="logout"),
+    path("auth/me/", views.MeView.as_view(), name="me"),
+    path("auth/change-password/", views.ChangePasswordView.as_view(), name="change-password"),
+    path("auth/my-memberships/", views.MyMembershipsView.as_view(), name="my-memberships"),
+    path("auth/my-events/", views.MyEventsView.as_view(), name="my-events"),
     # System settings (super admin only)
-    path("system-settings/", views.get_system_settings, name="system-settings"),
-    path("system-settings/update/", views.update_system_settings, name="update-system-settings"),
+    path("system-settings/", views.SystemSettingsView.as_view(), name="system-settings"),
     # Router URLs
     path("", include(router.urls)),
 ]

@@ -8,7 +8,8 @@ from django.http import HttpRequest
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import viewsets, status
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.views import APIView
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
@@ -51,101 +52,91 @@ def _validate_password_strength(password: str) -> Optional[str]:
     return None
 
 
-# Authentication Views
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def google_auth(request: HttpRequest) -> Response:
+# ────────────────────────────── Auth Views ──────────────────────────────
+
+
+class GoogleAuthView(APIView):
     """Handle Google OAuth authentication."""
-    if not settings.USE_GOOGLE_OAUTH:
-        return Response({"error": "Google OAuth is not enabled"}, status=status.HTTP_400_BAD_REQUEST)
 
-    token = request.data.get("token")
+    permission_classes = [AllowAny]
 
-    if not token:
-        return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request: HttpRequest) -> Response:
+        if not settings.USE_GOOGLE_OAUTH:
+            return Response({"error": "Google OAuth is not enabled"}, status=status.HTTP_400_BAD_REQUEST)
 
-    try:
-        # Verify the Google token
-        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), settings.GOOGLE_CLIENT_ID)
+        token = request.data.get("token")
+        if not token:
+            return Response({"error": "Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), settings.GOOGLE_CLIENT_ID)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         google_id = idinfo["sub"]
         email = idinfo["email"]
-
-        # Check if user exists
         user = User.objects.filter(Q(google_id=google_id) | Q(email=email)).first()
 
         if user:
-            # Update last login
             user.last_login = timezone.now()
             if not user.google_id:
                 user.google_id = google_id
             user.save()
 
-            # Issue a short-lived access token + HttpOnly refresh cookie
             access_token, refresh_token = generate_token_pair(user)
-
             response = Response({"token": access_token, "user": UserSerializer(user).data})
             set_refresh_cookie(response, refresh_token)
             return response
-        else:
-            # Return Google info for registration
+
+        return Response({"needs_registration": True, "google_id": google_id, "email": email})
+
+
+class LoginView(APIView):
+    """Handle traditional email/password login."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request: HttpRequest) -> Response:
+        if settings.USE_GOOGLE_OAUTH:
             return Response(
-                {
-                    "needs_registration": True,
-                    "google_id": google_id,
-                    "email": email,
-                }
+                {"error": "Traditional login is not enabled. Please use Google OAuth."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-    except ValueError as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        email = request.data.get("email")
+        password = request.data.get("password")
+        if not email or not password:
+            return Response({"error": "Email and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(email__iexact=email).first()
+        if user and user.check_password(password):
+            user.last_login = timezone.now()
+            user.save()
+
+            access_token, refresh_token = generate_token_pair(user)
+            response = Response({"token": access_token, "user": UserSerializer(user).data})
+            set_refresh_cookie(response, refresh_token)
+            return response
+
+        return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def login(request: HttpRequest) -> Response:
-    """Handle traditional email/password login."""
-    if settings.USE_GOOGLE_OAUTH:
-        return Response(
-            {"error": "Traditional login is not enabled. Please use Google OAuth."}, status=status.HTTP_400_BAD_REQUEST
-        )
-
-    email = request.data.get("email")
-    password = request.data.get("password")
-
-    if not email or not password:
-        return Response({"error": "Email and password are required"}, status=status.HTTP_400_BAD_REQUEST)
-
-    # Authenticate user
-    user = User.objects.filter(email__iexact=email).first()
-
-    if user and user.check_password(password):
-        # Update last login
-        user.last_login = timezone.now()
-        user.save()
-
-        # Issue a short-lived access token + HttpOnly refresh cookie
-        access_token, refresh_token = generate_token_pair(user)
-
-        response = Response({"token": access_token, "user": UserSerializer(user).data})
-        set_refresh_cookie(response, refresh_token)
-        return response
-
-    return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
-
-
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def register(request: HttpRequest) -> Response:
+class RegisterView(APIView):
     """Register a new user."""
-    serializer = UserCreateSerializer(data=request.data)
 
-    if serializer.is_valid():
-        # Check if email already exists
+    permission_classes = [AllowAny]
+
+    def post(self, request: HttpRequest) -> Response:
+        serializer = UserCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"error": "Invalid registration data", "details": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if User.objects.filter(email=serializer.validated_data["email"]).exists():
             return Response({"error": "A user with this email already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Ensure password is provided when Google OAuth is disabled
         if not settings.USE_GOOGLE_OAUTH and not serializer.validated_data.get("password"):
             return Response({"error": "Password is required"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -155,133 +146,120 @@ def register(request: HttpRequest) -> Response:
             if error:
                 return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Check if auto-approval is enabled
         system_settings = SystemSettings.get_settings()
-        if system_settings.auto_approve_users:
-            # Auto-approve: set user_type to member
-            user = serializer.save(user_type="member")
-        else:
-            # Default: user remains pending
-            user = serializer.save()
+        user_type = "member" if system_settings.auto_approve_users else "pending"
+        user = serializer.save(user_type=user_type)
 
         access_token, refresh_token = generate_token_pair(user)
-
         response = Response({"token": access_token, "user": UserSerializer(user).data}, status=status.HTTP_201_CREATED)
         set_refresh_cookie(response, refresh_token)
         return response
 
-    return Response(
-        {"error": "Invalid registration data", "details": serializer.errors}, status=status.HTTP_400_BAD_REQUEST
-    )
 
+class TokenRefreshView(APIView):
+    """Issue a new access token using the HttpOnly refresh cookie (rotates token)."""
 
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def token_refresh(request: HttpRequest) -> Response:
-    """Issue a new access token using the HttpOnly refresh cookie.
+    permission_classes = [AllowAny]
 
-    Also rotates the refresh token (single-use) per SIMPLE_JWT settings and
-    resets the HttpOnly cookie with the new refresh token.
-    """
-    refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
-    if not refresh_token:
-        return Response({"error": "No refresh token provided"}, status=status.HTTP_401_UNAUTHORIZED)
+    def post(self, request: HttpRequest) -> Response:
+        refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+        if not refresh_token:
+            return Response({"error": "No refresh token provided"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    try:
-        old_refresh = RefreshToken(refresh_token)
-        user_id = old_refresh["user_id"]
-        user = User.objects.get(id=user_id)
-        if not user.is_active:
-            return Response({"error": "User is inactive"}, status=status.HTTP_401_UNAUTHORIZED)
-
-        # Rotate: issue a brand new token pair, then blacklist the old refresh token (single-use)
-        access_token, new_refresh_token = generate_token_pair(user)
         try:
-            old_refresh.blacklist()
-        except AttributeError:
-            pass
-    except (TokenError, User.DoesNotExist) as e:
-        return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+            old_refresh = RefreshToken(refresh_token)
+            user = User.objects.get(id=old_refresh["user_id"])
+            if not user.is_active:
+                return Response({"error": "User is inactive"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    response = Response({"token": access_token})
-    set_refresh_cookie(response, new_refresh_token)
-    return response
+            access_token, new_refresh_token = generate_token_pair(user)
+            try:
+                old_refresh.blacklist()
+            except AttributeError:
+                pass
+        except (TokenError, User.DoesNotExist) as e:
+            return Response({"error": str(e)}, status=status.HTTP_401_UNAUTHORIZED)
+
+        response = Response({"token": access_token})
+        set_refresh_cookie(response, new_refresh_token)
+        return response
 
 
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def logout(request: HttpRequest) -> Response:
+class LogoutView(APIView):
     """Blacklist the current refresh token and clear the cookie."""
-    refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
-    if refresh_token:
-        try:
-            RefreshToken(refresh_token).blacklist()
-        except (TokenError, AttributeError):
-            pass
 
-    response = Response({"message": "Logged out successfully"})
-    clear_refresh_cookie(response)
-    return response
+    permission_classes = [AllowAny]
+
+    def post(self, request: HttpRequest) -> Response:
+        refresh_token = request.COOKIES.get(REFRESH_COOKIE_NAME)
+        if refresh_token:
+            try:
+                RefreshToken(refresh_token).blacklist()
+            except (TokenError, AttributeError):
+                pass
+
+        response = Response({"message": "Logged out successfully"})
+        clear_refresh_cookie(response)
+        return response
 
 
-@api_view(["GET"])
-def me(request: HttpRequest) -> Response:
+class MeView(APIView):
     """Get current user's profile."""
-    return Response(UserSerializer(request.user).data)
+
+    def get(self, request: HttpRequest) -> Response:
+        return Response(UserSerializer(request.user).data)
 
 
-@api_view(["POST"])
-def change_password(request: HttpRequest) -> Response:
+class ChangePasswordView(APIView):
     """Allow authenticated user to change their own password."""
-    current_password = request.data.get("current_password")
-    new_password = request.data.get("new_password")
 
-    if not current_password or not new_password:
-        return Response({"error": "current_password and new_password are required"}, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request: HttpRequest) -> Response:
+        current_password = request.data.get("current_password")
+        new_password = request.data.get("new_password")
 
-    if not request.user.check_password(current_password):
-        return Response({"error": "Current password is incorrect"}, status=status.HTTP_400_BAD_REQUEST)
+        if not current_password or not new_password:
+            return Response(
+                {"error": "current_password and new_password are required"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
-    if len(new_password) < 8:
-        return Response({"error": "New password must be at least 8 characters"}, status=status.HTTP_400_BAD_REQUEST)
+        if not request.user.check_password(current_password):
+            return Response({"error": "Current password is incorrect"}, status=status.HTTP_400_BAD_REQUEST)
 
-    error = _validate_password_strength(new_password)
-    if error:
-        return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+        if len(new_password) < 8:
+            return Response({"error": "New password must be at least 8 characters"}, status=status.HTTP_400_BAD_REQUEST)
 
-    request.user.set_password(new_password)
-    request.user.save()
-    return Response({"message": "Password changed successfully"})
+        error = _validate_password_strength(new_password)
+        if error:
+            return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
+
+        request.user.set_password(new_password)
+        request.user.save()
+        return Response({"message": "Password changed successfully"})
 
 
-@api_view(["GET"])
-def my_memberships(request: HttpRequest) -> Response:
+class MyMembershipsView(APIView):
     """Get current user's club memberships."""
-    memberships = ClubMembership.objects.filter(user=request.user).select_related("club")
-    serializer = ClubMembershipSerializer(memberships, many=True)
-    return Response(serializer.data)
+
+    def get(self, request: HttpRequest) -> Response:
+        memberships = ClubMembership.objects.filter(user=request.user).select_related("club")
+        serializer = ClubMembershipSerializer(memberships, many=True)
+        return Response(serializer.data)
 
 
-@api_view(["GET"])
-def my_events(request: HttpRequest) -> Response:
+class MyEventsView(APIView):
     """Get events where the current user has RSVP'd 'attending'."""
-    # Get user's attending events
-    attendances = EventAttendance.objects.filter(user=request.user, rsvp_status="attending").select_related(
-        "event", "event__club", "event__host"
-    )
 
-    # Extract events and filter to future events only (optional)
-    events = [attendance.event for attendance in attendances]
+    def get(self, request: HttpRequest) -> Response:
+        attendances = EventAttendance.objects.filter(user=request.user, rsvp_status="attending").select_related(
+            "event", "event__club", "event__host"
+        )
+        events = [attendance.event for attendance in attendances]
+        now = timezone.now()
+        events = [event for event in events if event.start_datetime >= now]
+        events.sort(key=lambda e: e.start_datetime)
 
-    # Filter to future events (optional - you can remove this to show all events)
-    now = timezone.now()
-    events = [event for event in events if event.start_datetime >= now]
-
-    # Sort by start date (upcoming events first)
-    events.sort(key=lambda e: e.start_datetime)
-
-    serializer = EventSerializer(events, many=True)
-    return Response(serializer.data)
+        serializer = EventSerializer(events, many=True)
+        return Response(serializer.data)
 
 
 # User Management Views
@@ -757,31 +735,37 @@ class EventViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-# System Settings Views
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def get_system_settings(request: HttpRequest) -> Response:
-    """Get system settings (super admin only)."""
-    if request.user.user_type != "super_admin":
-        return Response({"error": "Permission denied. Super admin access required."}, status=status.HTTP_403_FORBIDDEN)
-
-    settings_obj = SystemSettings.get_settings()
-    serializer = SystemSettingsSerializer(settings_obj)
-    return Response(serializer.data)
+# ────────────────────────── System Settings Views ─────────────────────────
 
 
-@api_view(["PATCH"])
-@permission_classes([IsAuthenticated])
-def update_system_settings(request: HttpRequest) -> Response:
-    """Update system settings (super admin only)."""
-    if request.user.user_type != "super_admin":
-        return Response({"error": "Permission denied. Super admin access required."}, status=status.HTTP_403_FORBIDDEN)
+class SystemSettingsView(APIView):
+    """Get or update system settings (super admin only)."""
 
-    settings_obj = SystemSettings.get_settings()
-    serializer = SystemSettingsSerializer(settings_obj, data=request.data, partial=True)
+    def _check_super_admin(self, request: HttpRequest) -> Optional[Response]:
+        if request.user.user_type != "super_admin":
+            return Response(
+                {"error": "Permission denied. Super admin access required."}, status=status.HTTP_403_FORBIDDEN
+            )
+        return None
 
-    if serializer.is_valid():
-        serializer.save(updated_by=request.user)
+    def get(self, request: HttpRequest) -> Response:
+        denied = self._check_super_admin(request)
+        if denied:
+            return denied
+
+        settings_obj = SystemSettings.get_settings()
+        serializer = SystemSettingsSerializer(settings_obj)
         return Response(serializer.data)
 
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def patch(self, request: HttpRequest) -> Response:
+        denied = self._check_super_admin(request)
+        if denied:
+            return denied
+
+        settings_obj = SystemSettings.get_settings()
+        serializer = SystemSettingsSerializer(settings_obj, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save(updated_by=request.user)
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

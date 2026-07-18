@@ -291,7 +291,7 @@ export const systemSettingsAPI = {
   },
 
   updateSettings: async (data: Record<string, unknown>) => {
-    const response = await apiFetch('/system-settings/update/', { method: 'PATCH', body: data });
+    const response = await apiFetch('/system-settings/', { method: 'PATCH', body: data });
     return handleResponse(response);
   },
 };
