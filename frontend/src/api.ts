@@ -239,7 +239,7 @@ export const topicsAPI = {
   },
 
   expressInterest: async (topicId: number) => {
-    const response = await apiFetch(`/topics/${topicId}/express_interest/`, { method: 'POST' });
+    const response = await apiFetch(`/topics/${topicId}/set_interest/`, { method: 'POST' });
     return handleResponse(response);
   },
 };
