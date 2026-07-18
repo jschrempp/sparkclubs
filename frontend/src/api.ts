@@ -245,6 +245,11 @@ export const topicsAPI = {
     });
     return handleResponse(response);
   },
+
+  removeInterest: async (topicId: number) => {
+    const response = await apiFetch(`/topics/${topicId}/remove_interest/`, { method: 'POST' });
+    return handleResponse(response);
+  },
 };
 
 // Events API

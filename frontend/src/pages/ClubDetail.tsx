@@ -124,6 +124,12 @@ const ClubDetail: React.FC = () => {
     onError: (err: Error) => alert(err.message),
   });
 
+  const removeInterestMutation = useMutation({
+    mutationFn: (topicId: number) => topicsAPI.removeInterest(topicId),
+    onSuccess: () => invalidateAll(),
+    onError: (err: Error) => alert(err.message),
+  });
+
   const approveMemberMutation = useMutation({
     mutationFn: (membershipId: number) => membershipsAPI.update(membershipId, { status: 'active' }),
     onSuccess: () => { alert('Member approved!'); invalidateAll(); },
@@ -378,7 +384,7 @@ const ClubDetail: React.FC = () => {
                       )}
                     </div>
                     <div style={{ marginTop: '10px' }}>
-                      <select className="form-control" style={{ width: 'auto' }} value={topic.user_interest || ''} onChange={(e) => { if (e.target.value) interestMutation.mutate({ topicId: topic.id, interestType: e.target.value }); }} title="Set my interest">
+                      <select className="form-control" style={{ width: 'auto' }} value={topic.user_interest || ''} onChange={(e) => { if (e.target.value) { interestMutation.mutate({ topicId: topic.id, interestType: e.target.value }); } else { removeInterestMutation.mutate(topic.id); } }} title="Set my interest">
                         <option value="">My interest: none</option>
                         <option value="interested">👍 Interested</option>
                         <option value="able_to_lead">🎤 I can lead this discussion</option>
