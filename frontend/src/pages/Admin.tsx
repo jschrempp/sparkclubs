@@ -1,10 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { usersAPI, systemSettingsAPI } from '../api';
 
-function Admin() {
-  const [users, setUsers] = useState([]);
+interface User {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  zip_code: string;
+  user_type: string;
+  club_creation_limit: number;
+  clubs_created_count: number;
+  club_memberships: {
+    club_id: number;
+    club_name: string;
+    status: string;
+    is_admin: boolean;
+    joined_at: string;
+  }[];
+}
+
+interface SystemSettings {
+  auto_approve_users: boolean;
+  auto_approve_club_memberships: boolean;
+}
+
+const Admin: React.FC = () => {
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [systemSettings, setSystemSettings] = useState(null);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
 
   useEffect(() => {
@@ -15,10 +38,9 @@ function Admin() {
   const loadUsers = async () => {
     try {
       const data = await usersAPI.list();
-      // Handle paginated response
       setUsers(Array.isArray(data) ? data : (data.results || []));
-    } catch (err) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -28,25 +50,25 @@ function Admin() {
     try {
       const data = await systemSettingsAPI.getSettings();
       setSystemSettings(data);
-    } catch (err) {
-      // Silently fail if not super admin
+    } catch (err: unknown) {
       console.error('Failed to load system settings:', err);
     } finally {
       setSettingsLoading(false);
     }
   };
 
-  const handleUpdateUserType = async (userId, newType) => {
+  const handleUpdateUserType = async (userId: number, newType: string) => {
     try {
       await usersAPI.updateUserType(userId, newType);
       loadUsers();
       alert('User type updated successfully');
-    } catch (err) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
   const handleToggleAutoApproval = async () => {
+    if (!systemSettings) return;
     try {
       const newValue = !systemSettings.auto_approve_users;
       const updatedSettings = await systemSettingsAPI.updateSettings({
@@ -54,12 +76,13 @@ function Admin() {
       });
       setSystemSettings(updatedSettings);
       alert(`User auto-approval ${newValue ? 'enabled' : 'disabled'} successfully`);
-    } catch (err) {
-      alert(err.message || 'Failed to update settings');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to update settings');
     }
   };
 
   const handleToggleClubAutoApproval = async () => {
+    if (!systemSettings) return;
     try {
       const newValue = !systemSettings.auto_approve_club_memberships;
       const updatedSettings = await systemSettingsAPI.updateSettings({
@@ -67,24 +90,24 @@ function Admin() {
       });
       setSystemSettings(updatedSettings);
       alert(`Club membership auto-approval ${newValue ? 'enabled' : 'disabled'} successfully`);
-    } catch (err) {
-      alert(err.message || 'Failed to update settings');
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to update settings');
     }
   };
 
-  const handleIncreaseClubLimit = async (userId) => {
+  const handleIncreaseClubLimit = async (userId: number) => {
     try {
       const result = await usersAPI.increaseClubLimit(userId);
       loadUsers();
       alert(result.message);
-    } catch (err) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
   if (loading) return <div className="loading">Loading users...</div>;
 
-  const getStatusBadgeColor = (status) => {
+  const getStatusBadgeColor = (status: string) => {
     switch(status) {
       case 'active': return 'success';
       case 'pending': return 'warning';
@@ -93,11 +116,10 @@ function Admin() {
     }
   };
 
-  const renderClubMemberships = (memberships) => {
+  const renderClubMemberships = (memberships: User['club_memberships']) => {
     if (!memberships || memberships.length === 0) {
       return <span className="text-muted">None</span>;
     }
-
     return (
       <div className="club-memberships">
         {memberships.map((membership) => (
@@ -123,23 +145,12 @@ function Admin() {
         <div className="card" style={{ marginBottom: '20px', backgroundColor: '#f8f9fa' }}>
           <h2 style={{ fontSize: '1.2rem', marginBottom: '15px' }}>System Settings</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            <label style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              cursor: 'pointer',
-              fontSize: '1rem'
-            }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '1rem' }}>
               <input
                 type="checkbox"
                 checked={systemSettings.auto_approve_users}
                 onChange={handleToggleAutoApproval}
-                style={{ 
-                  width: '20px', 
-                  height: '20px', 
-                  marginRight: '10px',
-                  cursor: 'pointer',
-                  flexShrink: 0
-                }}
+                style={{ width: '20px', height: '20px', marginRight: '10px', cursor: 'pointer', flexShrink: 0 }}
               />
               <span>
                 <strong>Auto-approve new users</strong>
@@ -149,23 +160,12 @@ function Admin() {
               </span>
             </label>
             
-            <label style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              cursor: 'pointer',
-              fontSize: '1rem'
-            }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '1rem' }}>
               <input
                 type="checkbox"
                 checked={systemSettings.auto_approve_club_memberships}
                 onChange={handleToggleClubAutoApproval}
-                style={{ 
-                  width: '20px', 
-                  height: '20px', 
-                  marginRight: '10px',
-                  cursor: 'pointer',
-                  flexShrink: 0
-                }}
+                style={{ width: '20px', height: '20px', marginRight: '10px', cursor: 'pointer', flexShrink: 0 }}
               />
               <span>
                 <strong>Auto-approve club membership requests</strong>
@@ -239,6 +239,6 @@ function Admin() {
       </div>
     </div>
   );
-}
+};
 
 export default Admin;

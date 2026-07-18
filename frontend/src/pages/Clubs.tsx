@@ -2,8 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { clubsAPI } from '../api';
 
-function Clubs() {
-  const [clubs, setClubs] = useState([]);
+interface Club {
+  id: number;
+  name: string;
+  description: string;
+  zip_code: string;
+  is_public: boolean;
+  member_count: number;
+  user_membership: {
+    status: string;
+    is_admin: boolean;
+  } | null;
+}
+
+const Clubs: React.FC = () => {
+  const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -21,57 +34,54 @@ function Clubs() {
   const loadClubs = async () => {
     try {
       const data = await clubsAPI.list();
-      // Handle paginated response
       setClubs(Array.isArray(data) ? data : (data.results || []));
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleJoinClub = async (clubId) => {
+  const handleJoinClub = async (clubId: number) => {
     try {
       await clubsAPI.join(clubId);
       alert('Join request sent! Waiting for admin approval.');
       loadClubs();
-    } catch (err) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
-  const handleCancelRequest = async (clubId) => {
-    if (!window.confirm('Are you sure you want to cancel your join request?')) {
-      return;
-    }
+  const handleCancelRequest = async (clubId: number) => {
+    if (!window.confirm('Are you sure you want to cancel your join request?')) return;
     try {
       await clubsAPI.leave(clubId);
       alert('Join request cancelled.');
       loadClubs();
-    } catch (err) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
-  const handleRejoin = async (clubId) => {
+  const handleRejoin = async (clubId: number) => {
     try {
       await clubsAPI.join(clubId);
       alert('Rejoin request sent! Waiting for admin approval.');
       loadClubs();
-    } catch (err) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
-  const handleCreateClub = async (e) => {
+  const handleCreateClub = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await clubsAPI.create(formData);
       setShowCreateForm(false);
       setFormData({ name: '', description: '', zip_code: '', is_public: true });
       loadClubs();
-    } catch (err) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
@@ -111,7 +121,7 @@ function Clubs() {
                 className="form-control"
                 value={formData.description}
                 onChange={(e) => setFormData({...formData, description: e.target.value})}
-                rows="3"
+                rows={3}
                 required
               />
             </div>
@@ -169,7 +179,6 @@ function Clubs() {
               <p><strong>Location:</strong> {club.zip_code}</p>
               <p><strong>Members:</strong> {club.member_count}</p>
               
-              {/* Show membership status if user has a membership */}
               {club.user_membership && (
                 <div className="mb-1">
                   <span className={`badge badge-${club.user_membership.status}`}>
@@ -187,7 +196,6 @@ function Clubs() {
                 <Link to={`/clubs/${club.id}`} className="btn btn-primary btn-sm">
                   View Details
                 </Link>
-                {/* Only show Join button if user doesn't have a membership */}
                 {!club.user_membership && (
                   <button 
                     className="btn btn-success btn-sm"
@@ -196,7 +204,6 @@ function Clubs() {
                     Join Club
                   </button>
                 )}
-                {/* Show relevant action based on membership status */}
                 {club.user_membership && club.user_membership.status === 'pending' && (
                   <button 
                     className="btn btn-secondary btn-sm"
@@ -220,6 +227,6 @@ function Clubs() {
       )}
     </div>
   );
-}
+};
 
 export default Clubs;

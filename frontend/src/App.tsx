@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { type ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './AuthContext';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -14,14 +15,16 @@ import Admin from './pages/Admin';
 import About from './pages/About';
 import './index.css';
 
-function PrivateRoute({ children }) {
+const queryClient = new QueryClient();
+
+function PrivateRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 }
 
-function AdminRoute({ children }) {
+function AdminRoute({ children }: { children: ReactNode }) {
   const { isSiteAdmin } = useAuth();
-  return isSiteAdmin ? children : <Navigate to="/dashboard" />;
+  return isSiteAdmin ? <>{children}</> : <Navigate to="/dashboard" />;
 }
 
 function AppRoutes() {
@@ -99,11 +102,13 @@ function AppRoutes() {
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </Router>
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </Router>
+    </QueryClientProvider>
   );
 }
 

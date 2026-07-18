@@ -5,16 +5,16 @@
 // it disappears on full page reload/new tab, so the user needs to log in
 // again in those cases - a deliberate tradeoff for reduced XSS exposure.
 
-let currentToken = null;
+let currentToken: string | null = null;
 
-export function getToken() {
+export function getToken(): string | null {
   return currentToken;
 }
 
-export function setToken(token) {
+export function setToken(token: string): void {
   currentToken = token;
 }
 
-export function clearToken() {
+export function clearToken(): void {
   currentToken = null;
 }

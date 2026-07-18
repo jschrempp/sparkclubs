@@ -3,23 +3,47 @@ import { useAuth } from '../AuthContext';
 import { authAPI, clubsAPI } from '../api';
 import { Link } from 'react-router-dom';
 
-function Dashboard() {
+interface Membership {
+  id: number;
+  club: number;
+  club_name: string;
+  club_description: string;
+  club_zip_code: string;
+  status: string;
+  is_admin: boolean;
+  joined_at: string;
+}
+
+interface Event {
+  id: number;
+  title: string;
+  start_datetime: string;
+  end_datetime: string;
+  location: string;
+  club: number;
+  club_name: string;
+  host_name: string;
+  topics: { id: number; title: string }[];
+  attendance_count: number;
+}
+
+const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  const [memberships, setMemberships] = useState([]);
-  const [events, setEvents] = useState([]);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventsLoading, setEventsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [eventsError, setEventsError] = useState(null);
-  const [leavingClubId, setLeavingClubId] = useState(null);
-  const [successMessage, setSuccessMessage] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+  const [leavingClubId, setLeavingClubId] = useState<number | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user.user_type !== 'pending') {
+    if (user?.user_type !== 'pending') {
       fetchMemberships();
       fetchEvents();
     }
-  }, [user.user_type]);
+  }, [user?.user_type]);
 
   const fetchMemberships = async () => {
     try {
@@ -27,8 +51,8 @@ function Dashboard() {
       setError(null);
       const data = await authAPI.myMemberships();
       setMemberships(data);
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -40,16 +64,16 @@ function Dashboard() {
       setEventsError(null);
       const data = await authAPI.myEvents();
       setEvents(data);
-    } catch (err) {
-      setEventsError(err.message);
+    } catch (err: unknown) {
+      setEventsError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setEventsLoading(false);
     }
   };
 
-  const formatEventDate = (dateString) => {
+  const formatEventDate = (dateString: string) => {
     const date = new Date(dateString);
-    const options = { 
+    const options: Intl.DateTimeFormatOptions = { 
       weekday: 'long', 
       year: 'numeric', 
       month: 'long', 
@@ -60,22 +84,19 @@ function Dashboard() {
     return date.toLocaleDateString('en-US', options);
   };
 
-  const formatEventTime = (startString, endString) => {
+  const formatEventTime = (startString: string, endString: string) => {
     const start = new Date(startString);
     const end = new Date(endString);
-    const options = { hour: 'numeric', minute: '2-digit' };
+    const options: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
     return `${start.toLocaleTimeString('en-US', options)} - ${end.toLocaleTimeString('en-US', options)}`;
   };
 
-  const handleLeaveClub = async (clubId, clubName) => {
-    // Show confirmation dialog
+  const handleLeaveClub = async (clubId: number, clubName: string) => {
     const confirmed = window.confirm(
       `Are you sure you want to leave "${clubName}"?\n\nThis action cannot be undone. You will need to request to join again if you change your mind.`
     );
     
-    if (!confirmed) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       setLeavingClubId(clubId);
@@ -83,26 +104,21 @@ function Dashboard() {
       setSuccessMessage(null);
       
       await clubsAPI.leave(clubId);
-      
-      // Show success message
       setSuccessMessage(`Successfully left "${clubName}"`);
-      
-      // Refresh memberships list
       await fetchMemberships();
       
-      // Clear success message after 5 seconds
       setTimeout(() => {
         setSuccessMessage(null);
       }, 5000);
-    } catch (err) {
-      setError(`Failed to leave club: ${err.message}`);
+    } catch (err: unknown) {
+      setError(`Failed to leave club: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLeavingClubId(null);
     }
   };
 
-  const getStatusBadge = (status) => {
-    const badges = {
+  const getStatusBadge = (status: string) => {
+    const badges: Record<string, { label: string; className: string }> = {
       pending: { label: 'Pending Approval', className: 'badge-pending' },
       active: { label: 'Active Member', className: 'badge-active' },
       removed: { label: 'Removed', className: 'badge-removed' },
@@ -111,12 +127,12 @@ function Dashboard() {
     return <span className={`badge ${badge.className}`}>{badge.label}</span>;
   };
 
-  if (user.user_type === 'pending') {
+  if (user?.user_type === 'pending') {
     return (
       <div className="container">
         <div className="card" style={{ textAlign: 'center', padding: '60px' }}>
           <h2>Account Pending Approval</h2>
-          <p>Your account is waiting for admin approval. You'll be notified once approved.</p>
+          <p>Your account is waiting for admin approval. You&apos;ll be notified once approved.</p>
         </div>
       </div>
     );
@@ -124,16 +140,16 @@ function Dashboard() {
 
   return (
     <div className="container">
-      <h1>Welcome, {user.first_name}!</h1>
+      <h1>Welcome, {user?.first_name}!</h1>
       
       <div className="grid">
         <div className="card">
           <h3>Your Profile</h3>
-          <p><strong>Email:</strong> {user.email}</p>
-          <p><strong>Name:</strong> {user.first_name} {user.last_name}</p>
-          <p><strong>Zip Code:</strong> {user.zip_code}</p>
-          <p><strong>Role:</strong> {user.user_type}</p>
-          {user.bio && <p><strong>Bio:</strong> {user.bio}</p>}
+          <p><strong>Email:</strong> {user?.email}</p>
+          <p><strong>Name:</strong> {user?.first_name} {user?.last_name}</p>
+          <p><strong>Zip Code:</strong> {user?.zip_code}</p>
+          <p><strong>Role:</strong> {user?.user_type}</p>
+          {user?.bio && <p><strong>Bio:</strong> {user.bio}</p>}
         </div>
 
         <div className="card">
@@ -154,12 +170,8 @@ function Dashboard() {
         
         {successMessage && (
           <div style={{ 
-            color: '#155724', 
-            padding: '12px', 
-            background: '#d4edda', 
-            border: '1px solid #c3e6cb',
-            borderRadius: '4px', 
-            marginBottom: '15px' 
+            color: '#155724', padding: '12px', background: '#d4edda', 
+            border: '1px solid #c3e6cb', borderRadius: '4px', marginBottom: '15px' 
           }}>
             {successMessage}
           </div>
@@ -167,12 +179,8 @@ function Dashboard() {
         
         {error && (
           <div style={{ 
-            color: '#721c24', 
-            padding: '12px', 
-            background: '#f8d7da', 
-            border: '1px solid #f5c6cb',
-            borderRadius: '4px', 
-            marginBottom: '15px' 
+            color: '#721c24', padding: '12px', background: '#f8d7da', 
+            border: '1px solid #f5c6cb', borderRadius: '4px', marginBottom: '15px' 
           }}>
             Error: {error}
           </div>
@@ -180,7 +188,7 @@ function Dashboard() {
 
         {!loading && !error && memberships.length === 0 && (
           <div style={{ textAlign: 'center', padding: '20px' }}>
-            <p>You haven't joined any clubs yet.</p>
+            <p>You haven&apos;t joined any clubs yet.</p>
             <Link to="/clubs" className="btn btn-primary">Browse Clubs</Link>
           </div>
         )}
@@ -211,9 +219,7 @@ function Dashboard() {
                         : membership.club_description}
                     </td>
                     <td style={{ padding: '12px' }}>{membership.club_zip_code}</td>
-                    <td style={{ padding: '12px' }}>
-                      {getStatusBadge(membership.status)}
-                    </td>
+                    <td style={{ padding: '12px' }}>{getStatusBadge(membership.status)}</td>
                     <td style={{ padding: '12px' }}>
                       {membership.is_admin ? (
                         <span className="badge badge-admin">Admin</span>
@@ -239,8 +245,7 @@ function Dashboard() {
                             disabled={leavingClubId === membership.club}
                             className="btn btn-sm btn-danger"
                             style={{ 
-                              fontSize: '0.9em', 
-                              padding: '4px 12px',
+                              fontSize: '0.9em', padding: '4px 12px',
                               opacity: leavingClubId === membership.club ? 0.6 : 1,
                               cursor: leavingClubId === membership.club ? 'not-allowed' : 'pointer'
                             }}
@@ -258,7 +263,6 @@ function Dashboard() {
         )}
       </div>
 
-      {/* Upcoming Events Section */}
       <div className="card" style={{ marginTop: '20px' }}>
         <h3>Your Upcoming Events</h3>
         
@@ -266,12 +270,8 @@ function Dashboard() {
         
         {eventsError && (
           <div style={{ 
-            color: '#721c24', 
-            padding: '12px', 
-            background: '#f8d7da', 
-            border: '1px solid #f5c6cb',
-            borderRadius: '4px', 
-            marginBottom: '15px' 
+            color: '#721c24', padding: '12px', background: '#f8d7da', 
+            border: '1px solid #f5c6cb', borderRadius: '4px', marginBottom: '15px' 
           }}>
             Error: {eventsError}
           </div>
@@ -279,7 +279,7 @@ function Dashboard() {
 
         {!eventsLoading && !eventsError && events.length === 0 && (
           <div style={{ textAlign: 'center', padding: '20px' }}>
-            <p>You haven't RSVP'd to any upcoming events yet.</p>
+            <p>You haven&apos;t RSVP&apos;d to any upcoming events yet.</p>
             <p style={{ marginTop: '10px', color: '#666' }}>
               Visit your club pages to see and RSVP to events.
             </p>
@@ -292,81 +292,57 @@ function Dashboard() {
               <div 
                 key={event.id} 
                 style={{ 
-                  border: '1px solid #ddd', 
-                  borderRadius: '8px', 
-                  padding: '16px',
-                  background: '#f9f9f9',
-                  transition: 'box-shadow 0.2s',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                  border: '1px solid #ddd', borderRadius: '8px', padding: '16px',
+                  background: '#f9f9f9', boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                   <div style={{ flex: 1 }}>
                     <h4 style={{ margin: '0 0 8px 0', color: '#333' }}>{event.title}</h4>
-                    
                     <div style={{ marginBottom: '6px' }}>
                       <strong style={{ color: '#666', fontSize: '0.9em' }}>📅 Date:</strong>{' '}
-                      <span style={{ color: '#444' }}>
-                        {formatEventDate(event.start_datetime)}
-                      </span>
+                      <span style={{ color: '#444' }}>{formatEventDate(event.start_datetime)}</span>
                     </div>
-                    
                     <div style={{ marginBottom: '6px' }}>
                       <strong style={{ color: '#666', fontSize: '0.9em' }}>⏰ Time:</strong>{' '}
-                      <span style={{ color: '#444' }}>
-                        {formatEventTime(event.start_datetime, event.end_datetime)}
-                      </span>
+                      <span style={{ color: '#444' }}>{formatEventTime(event.start_datetime, event.end_datetime)}</span>
                     </div>
-                    
                     <div style={{ marginBottom: '6px' }}>
                       <strong style={{ color: '#666', fontSize: '0.9em' }}>📍 Location:</strong>{' '}
                       <span style={{ color: '#444' }}>{event.location}</span>
                     </div>
-                    
                     <div style={{ marginBottom: '6px' }}>
                       <strong style={{ color: '#666', fontSize: '0.9em' }}>📚 Club:</strong>{' '}
                       <span style={{ color: '#444' }}>{event.club_name}</span>
                     </div>
-                    
                     {event.topics && event.topics.length > 0 && (
                       <div style={{ marginBottom: '6px' }}>
                         <strong style={{ color: '#666', fontSize: '0.9em' }}>💬 Topics:</strong>{' '}
                         <span style={{ color: '#444' }}>{event.topics.map(t => t.title).join(', ')}</span>
                       </div>
                     )}
-                    
                     {event.host_name && (
                       <div style={{ marginBottom: '6px' }}>
                         <strong style={{ color: '#666', fontSize: '0.9em' }}>👤 Host:</strong>{' '}
                         <span style={{ color: '#444' }}>{event.host_name}</span>
                       </div>
                     )}
-                    
                     {event.attendance_count > 0 && (
                       <div style={{ marginTop: '8px' }}>
                         <span style={{ 
-                          backgroundColor: '#28a745', 
-                          color: 'white', 
-                          padding: '4px 8px', 
-                          borderRadius: '4px',
-                          fontSize: '0.85em',
-                          fontWeight: 'bold'
+                          backgroundColor: '#28a745', color: 'white', padding: '4px 8px', 
+                          borderRadius: '4px', fontSize: '0.85em', fontWeight: 'bold'
                         }}>
                           {event.attendance_count} {event.attendance_count === 1 ? 'person' : 'people'} attending
                         </span>
                       </div>
                     )}
                   </div>
-                  
                   <div>
                     <Link 
                       to={`/clubs/${event.club}`} 
                       className="btn btn-sm"
-                      style={{ 
-                        fontSize: '0.9em', 
-                        padding: '6px 14px',
-                        whiteSpace: 'nowrap'
-                      }}
+                      style={{ fontSize: '0.9em', padding: '6px 14px', whiteSpace: 'nowrap' }}
                     >
                       View Club
                     </Link>
@@ -379,6 +355,6 @@ function Dashboard() {
       </div>
     </div>
   );
-}
+};
 
 export default Dashboard;

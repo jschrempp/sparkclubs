@@ -1,10 +1,36 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, type ReactNode } from 'react';
 import { authAPI } from './api';
 import { getToken, setToken, clearToken } from './tokenStore';
 
-const AuthContext = createContext(null);
+interface User {
+  id: number;
+  email: string;
+  first_name: string;
+  last_name: string;
+  zip_code: string;
+  bio: string | null;
+  user_type: string;
+  created_at: string;
+  updated_at: string;
+  last_login: string | null;
+  club_creation_limit?: number;
+}
 
-export const useAuth = () => {
+interface AuthContextType {
+  user: User | null;
+  login: (token: string, userData: User) => void;
+  logout: () => void;
+  updateUser: (userData: User) => void;
+  isAuthenticated: boolean;
+  isSuperAdmin: boolean;
+  isSiteAdmin: boolean;
+  isMember: boolean;
+  isPending: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider');
@@ -12,15 +38,11 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // The access token is kept in memory only (never in localStorage/
-    // sessionStorage) to reduce XSS exposure, so it does not survive a full
-    // page reload. If one is already present (e.g. hot reload during dev),
-    // validate it; otherwise the user simply needs to log in again.
     const token = getToken();
     if (token) {
       authAPI.me()
@@ -34,7 +56,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  const login = (token, userData) => {
+  const login = (token: string, userData: User) => {
     setToken(token);
     setUser(userData);
   };
@@ -44,11 +66,11 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  const updateUser = (userData) => {
+  const updateUser = (userData: User) => {
     setUser(userData);
   };
 
-  const value = {
+  const value: AuthContextType = {
     user,
     login,
     logout,

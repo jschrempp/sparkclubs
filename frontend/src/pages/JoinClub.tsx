@@ -3,8 +3,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { clubsAPI } from '../api';
 
-function JoinClub() {
-  const { inviteToken } = useParams();
+const JoinClub: React.FC = () => {
+  const { inviteToken } = useParams<{ inviteToken: string }>();
   const navigate = useNavigate();
   const { isAuthenticated, isPending } = useAuth();
   const [error, setError] = useState('');
@@ -16,15 +16,12 @@ function JoinClub() {
     }
 
     if (!isAuthenticated) {
-      // Remember which club to join once the user signs up / logs in
       localStorage.setItem('pendingClubInvite', inviteToken);
       navigate('/login');
       return;
     }
 
     if (isPending) {
-      // Site account is still awaiting admin approval - queue the invite so
-      // it's retried automatically once the account is approved and they log in.
       localStorage.setItem('pendingClubInvite', inviteToken);
       navigate('/dashboard');
       return;
@@ -36,8 +33,8 @@ function JoinClub() {
       try {
         const membership = await clubsAPI.joinByToken(inviteToken);
         if (!cancelled) navigate(`/clubs/${membership.club}`);
-      } catch (err) {
-        if (!cancelled) setError(err.message || 'Unable to join this club.');
+      } catch (err: unknown) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Unable to join this club.');
       }
     })();
 
@@ -51,7 +48,7 @@ function JoinClub() {
       <div className="card" style={{ maxWidth: '500px', margin: '100px auto', textAlign: 'center' }}>
         {error ? (
           <>
-            <h2>Couldn't Join Club</h2>
+            <h2>Couldn&apos;t Join Club</h2>
             <p className="error">{error}</p>
             <Link to="/dashboard" className="btn btn-primary mt-1">Go to Dashboard</Link>
           </>
@@ -61,6 +58,6 @@ function JoinClub() {
       </div>
     </div>
   );
-}
+};
 
 export default JoinClub;

@@ -1,37 +1,35 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function Landing() {
+const Landing: React.FC = () => {
   const navigate = useNavigate();
 
   return (
     <div style={styles.container}>
-      {/* Header with Login/Signup button */}
       <header style={styles.header}>
         <div style={styles.logo}>
-          <h1 style={styles.logoText}>� Spark Clubs</h1>
+          <h1 style={styles.logoText}>✨ Spark Clubs</h1>
         </div>
         <div style={styles.headerRight}>
           <button 
             style={styles.aboutLink}
             onClick={() => navigate('/about')}
-            onMouseOver={(e) => e.target.style.color = '#007bff'}
-            onMouseOut={(e) => e.target.style.color = '#666'}
+            onMouseOver={(e) => { (e.target as HTMLButtonElement).style.color = '#007bff'; }}
+            onMouseOut={(e) => { (e.target as HTMLButtonElement).style.color = '#666'; }}
           >
             About
           </button>
           <button 
             style={styles.loginButton}
             onClick={() => navigate('/login')}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#0056b3'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#007bff'}
+            onMouseOver={(e) => { (e.target as HTMLButtonElement).style.backgroundColor = '#0056b3'; }}
+            onMouseOut={(e) => { (e.target as HTMLButtonElement).style.backgroundColor = '#007bff'; }}
           >
             Login / Sign Up
           </button>
         </div>
       </header>
 
-      {/* Hero Section */}
       <main style={styles.main}>
         <div style={styles.hero}>
           <div style={styles.heroContent}>
@@ -44,18 +42,16 @@ function Landing() {
             <button 
               style={styles.ctaButton}
               onClick={() => navigate('/login')}
-              onMouseOver={(e) => e.target.style.backgroundColor = '#218838'}
-              onMouseOut={(e) => e.target.style.backgroundColor = '#28a745'}
+              onMouseOver={(e) => { (e.target as HTMLButtonElement).style.backgroundColor = '#218838'; }}
+              onMouseOut={(e) => { (e.target as HTMLButtonElement).style.backgroundColor = '#28a745'; }}
             >
               Get Started
             </button>
           </div>
         </div>
 
-        {/* Image Section */}
         <div style={styles.imageSection}>
           <div style={styles.imageGrid}>
-            {/* Image 1 - Photo by Damian Santos (Pexels), cozy indoor gathering */}
             <div style={{...styles.imageCard, ...styles.imageCard1}}>
               <img 
                 src="https://images.pexels.com/photos/35203995/pexels-photo-35203995.jpeg?auto=compress&cs=tinysrgb&w=800"
@@ -67,7 +63,6 @@ function Landing() {
               </div>
             </div>
 
-            {/* Image 2 - Photo by Ron Lach (Pexels), group in a living room */}
             <div style={{...styles.imageCard, ...styles.imageCard2}}>
               <img 
                 src="https://images.pexels.com/photos/8275697/pexels-photo-8275697.jpeg?auto=compress&cs=tinysrgb&w=800"
@@ -81,7 +76,6 @@ function Landing() {
           </div>
         </div>
 
-        {/* Features Section */}
         <div style={styles.features}>
           <h2 style={styles.featuresTitle}>Why Join Our Discussion Clubs?</h2>
           <div style={styles.featureGrid}>
@@ -98,81 +92,69 @@ function Landing() {
             <div style={styles.featureCard}>
               <div style={styles.featureIcon}>💬</div>
               <h3 style={styles.featureTitle}>Discuss</h3>
-              <p style={styles.featureText}>Share insights and dive deep into meaningful conversations</p>
+              <p style={styles.featureText}>Engage in meaningful conversations with fellow thinkers</p>
             </div>
           </div>
         </div>
       </main>
 
-      {/* Footer */}
       <footer style={styles.footer}>
-        <p style={styles.footerText}>© 2026 Spark Clubs. Bringing thinkers together.</p>
+        <p>© 2026 Spark Clubs. All rights reserved.</p>
       </footer>
     </div>
   );
-}
+};
 
-const styles = {
+const styles: Record<string, React.CSSProperties> = {
   container: {
     minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
-    backgroundColor: '#f8f9fa',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '20px 40px',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'white',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    position: 'sticky',
-    top: 0,
-    zIndex: 1000,
   },
-  logo: {
-    display: 'flex',
-    alignItems: 'center',
-  },
+  logo: {},
   logoText: {
-    margin: 0,
     fontSize: '24px',
-    color: '#333',
-    fontWeight: '600',
+    color: '#007bff',
+    margin: 0,
   },
   headerRight: {
     display: 'flex',
-    alignItems: 'center',
     gap: '20px',
+    alignItems: 'center',
   },
   aboutLink: {
-    padding: '10px 20px',
-    fontSize: '16px',
-    backgroundColor: 'transparent',
-    color: '#666',
+    background: 'none',
     border: 'none',
+    color: '#666',
+    fontSize: '16px',
     cursor: 'pointer',
-    fontWeight: '500',
-    transition: 'color 0.3s ease',
+    textDecoration: 'underline',
   },
   loginButton: {
-    padding: '12px 30px',
-    fontSize: '16px',
+    padding: '10px 24px',
     backgroundColor: '#007bff',
     color: 'white',
     border: 'none',
-    borderRadius: '5px',
+    borderRadius: '4px',
+    fontSize: '16px',
     cursor: 'pointer',
-    fontWeight: '500',
-    transition: 'background-color 0.3s ease',
   },
   main: {
     flex: 1,
   },
   hero: {
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     padding: '80px 40px',
     textAlign: 'center',
-    backgroundColor: '#ffffff',
+    color: 'white',
   },
   heroContent: {
     maxWidth: '800px',
@@ -180,27 +162,22 @@ const styles = {
   },
   heroTitle: {
     fontSize: '48px',
-    fontWeight: '700',
-    color: '#333',
     marginBottom: '20px',
-    lineHeight: '1.2',
   },
   heroSubtitle: {
     fontSize: '20px',
-    color: '#666',
-    marginBottom: '40px',
-    lineHeight: '1.6',
+    lineHeight: 1.6,
+    marginBottom: '30px',
+    opacity: 0.9,
   },
   ctaButton: {
     padding: '16px 40px',
-    fontSize: '18px',
     backgroundColor: '#28a745',
     color: 'white',
     border: 'none',
-    borderRadius: '5px',
+    borderRadius: '4px',
+    fontSize: '18px',
     cursor: 'pointer',
-    fontWeight: '600',
-    transition: 'background-color 0.3s ease',
   },
   imageSection: {
     padding: '60px 40px',
@@ -218,18 +195,12 @@ const styles = {
     borderRadius: '12px',
     overflow: 'hidden',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    transition: 'transform 0.3s ease',
-    cursor: 'pointer',
   },
-  imageCard1: {
-    gridColumn: 'span 1',
-  },
-  imageCard2: {
-    gridColumn: 'span 1',
-  },
+  imageCard1: {},
+  imageCard2: {},
   image: {
     width: '100%',
-    height: '400px',
+    height: '300px',
     objectFit: 'cover',
     display: 'block',
   },
@@ -238,61 +209,54 @@ const styles = {
     bottom: 0,
     left: 0,
     right: 0,
+    background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
     padding: '20px',
-    background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
   },
   imageText: {
     color: 'white',
-    fontSize: '24px',
-    fontWeight: '600',
+    fontSize: '20px',
+    fontWeight: 'bold',
     margin: 0,
   },
   features: {
-    padding: '80px 40px',
-    backgroundColor: '#ffffff',
+    padding: '60px 40px',
     textAlign: 'center',
   },
   featuresTitle: {
-    fontSize: '36px',
-    fontWeight: '700',
-    color: '#333',
-    marginBottom: '50px',
+    fontSize: '32px',
+    marginBottom: '40px',
   },
   featureGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    gap: '40px',
+    gap: '30px',
     maxWidth: '1000px',
     margin: '0 auto',
   },
   featureCard: {
     padding: '30px',
-    textAlign: 'center',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
   },
   featureIcon: {
     fontSize: '48px',
-    marginBottom: '20px',
-  },
-  featureTitle: {
-    fontSize: '24px',
-    fontWeight: '600',
-    color: '#333',
     marginBottom: '15px',
   },
+  featureTitle: {
+    fontSize: '20px',
+    marginBottom: '10px',
+  },
   featureText: {
-    fontSize: '16px',
     color: '#666',
-    lineHeight: '1.6',
+    lineHeight: 1.5,
   },
   footer: {
-    padding: '30px 40px',
-    backgroundColor: '#333',
     textAlign: 'center',
-  },
-  footerText: {
-    color: '#fff',
-    margin: 0,
-    fontSize: '14px',
+    padding: '20px',
+    backgroundColor: '#f8f9fa',
+    borderTop: '1px solid #ddd',
+    color: '#666',
   },
 };
 

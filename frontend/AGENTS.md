@@ -8,6 +8,7 @@ Spark Groups, that are created and controlled by authenticated users.
 - **Architecture**: Decoupled React frontend communicating via REST API with a Django backend.
 - **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, TanStack Query (React Query).
 - **Backend**: Django 5.x, Django REST Framework (DRF), MySQL, Celery (async tasks).
+- **Deployment**: Railway.com
 
 ## 2. Django Backend Standards
 - **Coding Style**: Follow PEP 8 strictly. Use clear type hints for function signatures.

@@ -1,7 +1,7 @@
 import React from 'react';
 import versionInfo from '../version.json';
 
-function Footer() {
+const Footer: React.FC = () => {
   return (
     <footer style={{
       textAlign: 'center',
@@ -31,6 +31,6 @@ function Footer() {
       </div>
     </footer>
   );
-}
+};
 
 export default Footer;

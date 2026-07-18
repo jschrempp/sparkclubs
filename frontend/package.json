@@ -2,28 +2,36 @@
   "name": "bookclubs-frontend",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "react-router-dom": "^6.21.0",
-    "react-scripts": "5.0.1",
     "@react-oauth/google": "^0.12.1",
     "axios": "^1.6.5",
     "date-fns": "^3.0.6",
+    "@tanstack/react-query": "^5.62.0",
     "serve": "^14.2.1"
   },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "node generate-version.js && echo '\n=== BUILD COMPLETE ===' && cat src/version.json && echo '==================\n' && react-scripts build",
-    "preserve": "echo '\n========== STARTING SERVER ==========' && echo 'Deployed Version:' && cat build/../src/version.json && echo '====================================\n'",
-    "serve": "serve -s build -l $PORT",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0"
   },
-  "eslintConfig": {
-    "extends": [
-      "react-app"
-    ]
+  "scripts": {
+    "dev": "vite",
+    "start": "vite",
+    "build": "node generate-version.cjs && vite build",
+    "preview": "vite preview",
+    "preserve": "echo '\n========== STARTING SERVER ==========' && echo 'Deployed Version:' && cat dist/version.json 2>/dev/null || echo 'No version.json found' && echo '====================================\n'",
+    "serve": "serve -s dist -l $PORT",
+    "test": "echo \"No tests configured yet\"",
+    "eject": "echo \"eject is not available with Vite\""
   },
   "browserslist": {
     "production": [

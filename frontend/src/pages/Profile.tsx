@@ -2,18 +2,18 @@ import React, { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import { authAPI } from '../api';
 
-function Profile() {
+const Profile: React.FC = () => {
   const { user } = useAuth();
   const [form, setForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPasswords, setShowPasswords] = useState({});
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
-  const toggleShow = (field) =>
+  const toggleShow = (field: string) =>
     setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
 
-  const eyeBtn = (field) => (
+  const eyeBtn = (field: string) => (
     <button
       type="button"
       onClick={() => toggleShow(field)}
@@ -27,22 +27,22 @@ function Profile() {
   );
 
   const passwordRequirements = [
-    { label: 'At least 8 characters', test: (p) => p.length >= 8 },
-    { label: 'One uppercase letter', test: (p) => /[A-Z]/.test(p) },
-    { label: 'One lowercase letter', test: (p) => /[a-z]/.test(p) },
-    { label: 'One digit', test: (p) => /\d/.test(p) },
-    { label: 'One special character', test: (p) => /[^A-Za-z0-9]/.test(p) },
+    { label: 'At least 8 characters', test: (p: string) => p.length >= 8 },
+    { label: 'One uppercase letter', test: (p: string) => /[A-Z]/.test(p) },
+    { label: 'One lowercase letter', test: (p: string) => /[a-z]/.test(p) },
+    { label: 'One digit', test: (p: string) => /\d/.test(p) },
+    { label: 'One special character', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
   ];
 
-  const passwordValid = (p) => passwordRequirements.every((r) => r.test(p));
+  const passwordValid = (p: string) => passwordRequirements.every((r) => r.test(p));
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
     setMessage('');
     setError('');
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (form.new_password !== form.confirm_password) {
       setError('New passwords do not match');
@@ -57,8 +57,8 @@ function Profile() {
       await authAPI.changePassword(form.current_password, form.new_password);
       setMessage('Password changed successfully');
       setForm({ current_password: '', new_password: '', confirm_password: '' });
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -69,9 +69,9 @@ function Profile() {
       <h2>My Profile</h2>
 
       <div className="card" style={{ maxWidth: 480 }}>
-        <p><strong>Name:</strong> {user.first_name} {user.last_name}</p>
-        <p><strong>Email:</strong> {user.email}</p>
-        <p><strong>Role:</strong> {user.user_type.replace('_', ' ')}</p>
+        <p><strong>Name:</strong> {user?.first_name} {user?.last_name}</p>
+        <p><strong>Email:</strong> {user?.email}</p>
+        <p><strong>Role:</strong> {user?.user_type.replace('_', ' ')}</p>
       </div>
 
       <div className="card" style={{ maxWidth: 480 }}>
@@ -140,6 +140,6 @@ function Profile() {
       </div>
     </div>
   );
-}
+};
 
 export default Profile;

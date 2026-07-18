@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 
-function Header() {
+const Header: React.FC = () => {
   const { user, logout, isAuthenticated } = useAuth();
 
   return (
@@ -13,12 +13,12 @@ function Header() {
           <nav className="nav">
             <Link to="/dashboard">Dashboard</Link>
             <Link to="/clubs">Clubs</Link>
-            {user.user_type === 'site_admin' || user.user_type === 'super_admin' ? (
+            {user?.user_type === 'site_admin' || user?.user_type === 'super_admin' ? (
               <Link to="/admin">Admin</Link>
             ) : null}
             <Link to="/about">About</Link>
             <Link to="/profile">
-              {user.first_name} {user.last_name}
+              {user?.first_name} {user?.last_name}
             </Link>
             <button onClick={logout} className="btn btn-sm btn-secondary">
               Logout
@@ -28,6 +28,6 @@ function Header() {
       </div>
     </header>
   );
-}
+};
 
 export default Header;

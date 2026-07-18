@@ -6,12 +6,27 @@ import { authAPI, clubsAPI } from '../api';
 
 const USE_GOOGLE_OAUTH = process.env.REACT_APP_USE_GOOGLE_OAUTH === 'true';
 
-function Login() {
+interface FormData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  zip_code: string;
+  bio: string;
+  password: string;
+  confirmPassword: string;
+}
+
+interface GoogleData {
+  google_id: string;
+  email: string;
+}
+
+const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [showRegistration, setShowRegistration] = useState(false);
-  const [googleData, setGoogleData] = useState(null);
-  const [formData, setFormData] = useState({
+  const [googleData, setGoogleData] = useState<GoogleData | null>(null);
+  const [formData, setFormData] = useState<FormData>({
     first_name: '',
     last_name: '',
     email: '',
@@ -21,19 +36,14 @@ function Login() {
     confirmPassword: '',
   });
   const [error, setError] = useState('');
-  const [showPasswords, setShowPasswords] = useState({});
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
 
-  // After a successful login/registration, join any club the user was invited
-  // to via a /join/:inviteToken link, then send them there instead of the dashboard.
-  const completeAuth = async (token, userData) => {
-    login(token, userData);
+  const completeAuth = async (token: string, userData: Record<string, unknown>) => {
+    login(token, userData as never);
 
     const pendingInviteToken = localStorage.getItem('pendingClubInvite');
     if (pendingInviteToken) {
-      if (userData.user_type === 'pending') {
-        // Site account is still awaiting admin approval - the join request
-        // can't go through yet. Keep the invite queued so it's retried the
-        // next time this user logs in, once their account is approved.
+      if ((userData as Record<string, unknown>).user_type === 'pending') {
         navigate('/dashboard');
         return;
       }
@@ -42,8 +52,7 @@ function Login() {
         const membership = await clubsAPI.joinByToken(pendingInviteToken);
         localStorage.removeItem('pendingClubInvite');
         navigate(`/clubs/${membership.club}`);
-      } catch (err) {
-        // Invalid/expired invite - drop it and continue to the dashboard
+      } catch {
         localStorage.removeItem('pendingClubInvite');
         navigate('/dashboard');
       }
@@ -53,10 +62,10 @@ function Login() {
     navigate('/dashboard');
   };
 
-  const toggleShow = (field) =>
+  const toggleShow = (field: string) =>
     setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
 
-  const eyeBtn = (field) => (
+  const eyeBtn = (field: string) => (
     <button
       type="button"
       onClick={() => toggleShow(field)}
@@ -69,8 +78,7 @@ function Login() {
     </button>
   );
 
-  // Google OAuth handlers
-  const handleGoogleSuccess = async (credentialResponse) => {
+  const handleGoogleSuccess = async (credentialResponse: { credential: string }) => {
     try {
       const result = await authAPI.googleAuth(credentialResponse.credential);
       
@@ -82,46 +90,40 @@ function Login() {
         setFormData(prev => ({
           ...prev,
           email: result.email,
-          google_id: result.google_id,
         }));
         setShowRegistration(true);
       } else {
         await completeAuth(result.token, result.user);
       }
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
-  // Traditional login handler
-  const handleTraditionalLogin = async (e) => {
+  const handleTraditionalLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
     try {
       const result = await authAPI.login(formData.email, formData.password);
       await completeAuth(result.token, result.user);
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
-  // Password requirements (shared between registration and profile change)
   const passwordRequirements = [
-    { label: 'At least 8 characters', test: (p) => p.length >= 8 },
-    { label: 'One uppercase letter', test: (p) => /[A-Z]/.test(p) },
-    { label: 'One lowercase letter', test: (p) => /[a-z]/.test(p) },
-    { label: 'One digit', test: (p) => /\d/.test(p) },
-    { label: 'One special character', test: (p) => /[^A-Za-z0-9]/.test(p) },
+    { label: 'At least 8 characters', test: (p: string) => p.length >= 8 },
+    { label: 'One uppercase letter', test: (p: string) => /[A-Z]/.test(p) },
+    { label: 'One lowercase letter', test: (p: string) => /[a-z]/.test(p) },
+    { label: 'One digit', test: (p: string) => /\d/.test(p) },
+    { label: 'One special character', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
   ];
-  const passwordValid = (p) => passwordRequirements.every((r) => r.test(p));
+  const passwordValid = (p: string) => passwordRequirements.every((r) => r.test(p));
 
-  // Registration handler
-  const handleRegistrationSubmit = async (e) => {
+  const handleRegistrationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    // Validate password confirmation for traditional auth
     if (!USE_GOOGLE_OAUTH && formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -133,7 +135,7 @@ function Login() {
     }
 
     try {
-      const registrationData = {
+      const registrationData: Record<string, unknown> = {
         first_name: formData.first_name,
         last_name: formData.last_name,
         email: formData.email,
@@ -149,19 +151,18 @@ function Login() {
 
       const result = await authAPI.register(registrationData);
       await completeAuth(result.token, result.user);
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     });
   };
 
-  // Registration form
   if (showRegistration) {
     return (
       <div className="container">
@@ -265,8 +266,8 @@ function Login() {
                 className="form-control"
                 value={formData.bio}
                 onChange={handleInputChange}
-                rows="3"
-                maxLength="500"
+                rows={3}
+                maxLength={500}
               />
             </div>
             {error && <div className="error">{error}</div>}
@@ -298,10 +299,9 @@ function Login() {
     );
   }
 
-  // Google OAuth login
   if (USE_GOOGLE_OAUTH) {
     return (
-      <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID}>
+      <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || ''}>
         <div className="container">
           <div className="card" style={{ maxWidth: '500px', margin: '100px auto', textAlign: 'center' }}>
             <h1>Welcome to Spark Clubs</h1>
@@ -320,7 +320,6 @@ function Login() {
     );
   }
 
-  // Traditional login
   return (
     <div className="container">
       <div className="card" style={{ maxWidth: '500px', margin: '100px auto' }}>
@@ -361,7 +360,7 @@ function Login() {
         </form>
 
         <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <p>Don't have an account?</p>
+          <p>Don&apos;t have an account?</p>
           <button
             className="btn btn-secondary"
             onClick={() => {
@@ -384,6 +383,6 @@ function Login() {
       </div>
     </div>
   );
-}
+};
 
 export default Login;

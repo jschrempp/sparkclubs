@@ -1,6 +1,6 @@
 import React from 'react';
 
-function About() {
+const About: React.FC = () => {
   return (
     <div className="page-container">
       <div className="content">
@@ -31,11 +31,11 @@ function About() {
             <b>you see here, from the frontend to the backend, was created using no-code/low-code tools. </b>
             I used CoPilot Claude Sonet 4.5 to do the work. I started with a specification, about
             a page long. I asked CoPilot to improve the specification, adding any features it thought
-            ("thought"?) would be useful. Then I typed, "make the app from the specification." Wow, it 
+            (&quot;thought&quot;?) would be useful. Then I typed, &quot;make the app from the specification.&quot; Wow, it 
             did it.
         </p>
         <p>
-            Then came a long process of finding the most basic of bugs - a page didn't work, there was no 
+            Then came a long process of finding the most basic of bugs - a page didn&apos;t work, there was no 
             button to edit a book, an error when listing the users - and asking CoPilot to fix them. Which
             it did. 
         </p>
@@ -45,9 +45,9 @@ function About() {
             I asked CoPilot to fix them.</b>
         </p>
         <p>
-            After a good night's sleep I'd wake up to a few new features to add. And now here we are. 
+            After a good night&apos;s sleep I&apos;d wake up to a few new features to add. And now here we are. 
             <b> A fully functional web application, built without writing a single line of code myself.
-            I'm amazed at how far no-code/low-code tools have come, and excited to see what the future
+            I&apos;m amazed at how far no-code/low-code tools have come, and excited to see what the future
             holds for software development.</b>
         </p>
         <p>
@@ -62,7 +62,7 @@ function About() {
             Jim @JimmySonger.com<br />
             JimmySonger.com</b><br /><br />
 
-            I don't know who Jimmy Songer is, maybe CoPilot made him up? Or that's where it stole this code? 
+            I don&apos;t know who Jimmy Songer is, maybe CoPilot made him up? Or that&apos;s where it stole this code? 
             If so, then thank you Jimmy Songer. <br /><br />
             Jim Schrempp<br />
             jim@jimschrempp.com<br />
@@ -99,12 +99,11 @@ function About() {
         
         <h2>Contact & Support</h2>
         <p>
-          Have questions or feedback? We'd love to hear from you. 
-          Please reach out to our support team for assistance.
+          Have questions or feedback? We&apos;d love to hear from you! Reach out to us at support@sparkclubs.com.
         </p>
       </div>
     </div>
   );
-}
+};
 
 export default About;
