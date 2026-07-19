@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { clubsAPI } from '../api';
+import { setPendingInvite } from '../pendingInviteStore';
 
 const JoinClub: React.FC = () => {
   const { inviteToken } = useParams<{ inviteToken: string }>();
@@ -16,13 +17,13 @@ const JoinClub: React.FC = () => {
     }
 
     if (!isAuthenticated) {
-      localStorage.setItem('pendingClubInvite', inviteToken);
+      setPendingInvite(inviteToken);
       navigate('/login');
       return;
     }
 
     if (isPending) {
-      localStorage.setItem('pendingClubInvite', inviteToken);
+      setPendingInvite(inviteToken);
       navigate('/dashboard');
       return;
     }

@@ -3,6 +3,7 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { authAPI, clubsAPI } from '../api';
+import { getPendingInvite, clearPendingInvite } from '../pendingInviteStore';
 
 const USE_GOOGLE_OAUTH = import.meta.env.VITE_USE_GOOGLE_OAUTH === 'true';
 
@@ -41,7 +42,7 @@ const Login: React.FC = () => {
   const completeAuth = async (token: string, userData: Record<string, unknown>) => {
     login(token, userData as never);
 
-    const pendingInviteToken = localStorage.getItem('pendingClubInvite');
+    const pendingInviteToken = getPendingInvite();
     if (pendingInviteToken) {
       if ((userData as Record<string, unknown>).user_type === 'pending') {
         navigate('/dashboard');
@@ -50,10 +51,10 @@ const Login: React.FC = () => {
 
       try {
         const membership = await clubsAPI.joinByToken(pendingInviteToken);
-        localStorage.removeItem('pendingClubInvite');
+        clearPendingInvite();
         navigate(`/clubs/${membership.club}`);
       } catch {
-        localStorage.removeItem('pendingClubInvite');
+        clearPendingInvite();
         navigate('/dashboard');
       }
       return;
