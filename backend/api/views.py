@@ -768,4 +768,7 @@ class SystemSettingsView(APIView):
             serializer.save(updated_by=request.user)
             return Response(serializer.data)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": "Invalid settings data", "details": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
