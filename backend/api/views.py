@@ -562,8 +562,16 @@ class TopicViewSet(viewsets.ModelViewSet):
         if self.action in ["create"]:
             return [IsClubMember()]
         elif self.action in ["update", "partial_update", "destroy"]:
-            return [IsClubAdmin()]
+            # Club admins or topic creators can modify their own topics
+            return [IsAuthenticated()]
         return [IsAuthenticated()]
+
+    def check_object_permissions(self, request: HttpRequest, obj: Topic) -> None:
+        """Allow club admins OR the topic creator to update/delete."""
+        if self.action in ["update", "partial_update", "destroy"]:
+            if not request.user.is_club_admin(obj.club) and obj.created_by_id != request.user.id:
+                self.permission_denied(request, message="Only club admins or the topic creator can modify this topic.")
+        super().check_object_permissions(request, obj)
 
     def get_queryset(self) -> Any:
         """Filter topics based on permissions and club."""

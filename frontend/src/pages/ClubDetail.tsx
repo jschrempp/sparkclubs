@@ -10,6 +10,7 @@ interface Topic {
   description: string;
   tabs: string;
   status: string;
+  created_by: number;
   created_by_name: string;
   interest_counts: { interested: number; able_to_lead: number; not_interested: number };
   user_interest: string | null;
@@ -102,6 +103,8 @@ const ClubDetail: React.FC = () => {
   });
 
   const isClubAdmin = isSiteAdmin || members.find((m: Member) => m.user === user?.id && m.is_admin && m.status === 'active');
+
+  const isTopicCreator = (topic: Topic) => user?.id === topic.created_by;
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ['club', id] });
@@ -383,13 +386,20 @@ const ClubDetail: React.FC = () => {
                         <span className="badge badge-secondary">My interest: none</span>
                       )}
                     </div>
-                    <div style={{ marginTop: '10px' }}>
+                    <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <select className="form-control" style={{ width: 'auto' }} value={topic.user_interest || ''} onChange={(e) => { if (e.target.value) { interestMutation.mutate({ topicId: topic.id, interestType: e.target.value }); } else { removeInterestMutation.mutate(topic.id); } }} title="Set my interest">
                         <option value="">My interest: none</option>
                         <option value="interested">👍 Interested</option>
                         <option value="able_to_lead">🎤 I can lead this discussion</option>
                         <option value="not_interested">👎 Not interested</option>
                       </select>
+                      {isTopicCreator(topic) && (
+                        <button className="btn btn-sm btn-secondary" onClick={() => {
+                          setEditingTopicId(topic.id);
+                          setTopicFormData({ title: topic.title, description: topic.description, tabs: topic.tabs || '' });
+                          setShowTopicForm(true);
+                        }}>Edit</button>
+                      )}
                     </div>
                   </div>
                 ))}
