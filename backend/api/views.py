@@ -347,14 +347,16 @@ class ClubViewSet(viewsets.ModelViewSet):
         """Filter clubs based on permissions and visibility."""
         user = self.request.user
 
+        base = Club.objects.prefetch_related("memberships")
+
         # Site admins can see all clubs (active and inactive, public and private)
         if user.is_site_admin():
-            return Club.objects.all()
+            return base.all()
 
         # Regular members can see:
         # 1. All public active clubs
         # 2. Private clubs where they are a member
-        active_clubs = Club.objects.filter(is_active=True)
+        active_clubs = base.filter(is_active=True)
 
         # Get public clubs
         public_clubs = active_clubs.filter(is_public=True)
@@ -568,7 +570,7 @@ class TopicViewSet(viewsets.ModelViewSet):
         user = self.request.user
         club_id = self.request.query_params.get("club")
 
-        queryset = Topic.objects.all()
+        queryset = Topic.objects.select_related("created_by", "club").prefetch_related("interests")
 
         if club_id:
             queryset = queryset.filter(club_id=club_id)
@@ -654,7 +656,7 @@ class TopicViewSet(viewsets.ModelViewSet):
         if not request.user.is_club_admin(topic.club):
             return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
 
-        interests = topic.interests.all()
+        interests = topic.interests.select_related("user").all()
         serializer = TopicInterestSerializer(interests, many=True)
         return Response(serializer.data)
 
@@ -676,7 +678,7 @@ class EventViewSet(viewsets.ModelViewSet):
         club_id = self.request.query_params.get("club")
         status_filter = self.request.query_params.get("status", "active")
 
-        queryset = Event.objects.all()
+        queryset = Event.objects.select_related("club", "host").prefetch_related("event_topics__topic", "attendances")
 
         if club_id:
             queryset = queryset.filter(club_id=club_id)
