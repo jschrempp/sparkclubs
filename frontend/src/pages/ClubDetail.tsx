@@ -362,9 +362,46 @@ const ClubDetail: React.FC = () => {
               <div className="topics-list">
                 {topics.map((topic: Topic) => (
                   <div key={topic.id} className="card mb-2" style={{ padding: '16px' }}>
-                    <h4 style={{ margin: '0 0 8px 0', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.title}</h4>
-                    {topic.description && <p style={{ margin: '0 0 12px 0', color: '#333', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.description}</p>}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', fontSize: '0.8em', color: '#666', paddingTop: '8px', borderTop: '1px solid #eee' }}>
+                    {/* Top section: two-column layout */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '12px' }}>
+                      {/* Left column: Title + Description */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h4 style={{ margin: '0 0 8px 0', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.title}</h4>
+                        {topic.description && (
+                          <p style={{ margin: 0, color: '#333', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.description}</p>
+                        )}
+                      </div>
+                      {/* Right column: Controls + Counts */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          {isTopicCreator(topic) && (
+                            <button className="btn btn-sm btn-secondary" onClick={() => {
+                              setEditingTopicId(topic.id);
+                              setTopicFormData({ title: topic.title, description: topic.description, tabs: topic.tabs || '' });
+                              setShowTopicForm(true);
+                            }}>Edit</button>
+                          )}
+                          <select className="form-control" style={{ width: 'auto' }} value={topic.user_interest || ''} onChange={(e) => { if (e.target.value) { interestMutation.mutate({ topicId: topic.id, interestType: e.target.value }); } else { removeInterestMutation.mutate(topic.id); } }} title="Set my interest">
+                            <option value="">My interest: none</option>
+                            <option value="interested">👍 Interested</option>
+                            <option value="able_to_lead">🎤 I can lead this discussion</option>
+                            <option value="not_interested">👎 Not interested</option>
+                          </select>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.85em', color: '#666', whiteSpace: 'nowrap' }}>
+                          <span>👍 {topic.interest_counts?.interested || 0}</span>
+                          <span>🎤 {topic.interest_counts?.able_to_lead || 0}</span>
+                          <span>👎 {topic.interest_counts?.not_interested || 0}</span>
+                          {topic.user_interest ? (
+                            <span className="badge badge-success">My: {topic.user_interest}</span>
+                          ) : (
+                            <span className="badge badge-secondary">My: none</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Divider + Bottom metadata */}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', fontSize: '0.8em', color: '#666', paddingTop: '8px' }}>
                       {topic.tabs && <span>🏷 {topic.tabs}</span>}
                       <span>👤 {topic.created_by_name}</span>
                       {isClubAdmin ? (
@@ -376,29 +413,6 @@ const ClubDetail: React.FC = () => {
                         </select>
                       ) : (
                         <span className={`badge badge-${topic.status}`}>{topic.status}</span>
-                      )}
-                      <span>👍 {topic.interest_counts?.interested || 0}</span>
-                      <span>🎤 {topic.interest_counts?.able_to_lead || 0}</span>
-                      <span>👎 {topic.interest_counts?.not_interested || 0}</span>
-                      {topic.user_interest ? (
-                        <span className="badge badge-success">My interest: {topic.user_interest}</span>
-                      ) : (
-                        <span className="badge badge-secondary">My interest: none</span>
-                      )}
-                    </div>
-                    <div style={{ marginTop: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <select className="form-control" style={{ width: 'auto' }} value={topic.user_interest || ''} onChange={(e) => { if (e.target.value) { interestMutation.mutate({ topicId: topic.id, interestType: e.target.value }); } else { removeInterestMutation.mutate(topic.id); } }} title="Set my interest">
-                        <option value="">My interest: none</option>
-                        <option value="interested">👍 Interested</option>
-                        <option value="able_to_lead">🎤 I can lead this discussion</option>
-                        <option value="not_interested">👎 Not interested</option>
-                      </select>
-                      {isTopicCreator(topic) && (
-                        <button className="btn btn-sm btn-secondary" onClick={() => {
-                          setEditingTopicId(topic.id);
-                          setTopicFormData({ title: topic.title, description: topic.description, tabs: topic.tabs || '' });
-                          setShowTopicForm(true);
-                        }}>Edit</button>
                       )}
                     </div>
                   </div>
