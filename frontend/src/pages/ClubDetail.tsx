@@ -371,7 +371,7 @@ const ClubDetail: React.FC = () => {
                           <p style={{ margin: 0, color: '#333', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.description}</p>
                         )}
                       </div>
-                      {/* Right column: Controls + Counts */}
+                      {/* Right column: Controls + Counts + Meta */}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           {isTopicCreator(topic) && (
@@ -393,12 +393,14 @@ const ClubDetail: React.FC = () => {
                           <span>🎤 {topic.interest_counts?.able_to_lead || 0}</span>
                           <span>👎 {topic.interest_counts?.not_interested || 0}</span>
                         </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.8em', color: '#666' }}>
+                          {topic.tabs && <span>🏷 {topic.tabs}</span>}
+                          <span>👤 {topic.created_by_name}</span>
+                        </div>
                       </div>
                     </div>
-                    {/* Divider + Bottom metadata */}
+                    {/* Status row */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', fontSize: '0.8em', color: '#666', paddingTop: '8px' }}>
-                      {topic.tabs && <span>🏷 {topic.tabs}</span>}
-                      <span>👤 {topic.created_by_name}</span>
                       {isClubAdmin ? (
                         <select className="form-control" style={{ width: 'auto', fontSize: 'inherit', padding: '2px 4px' }} value={topic.status} onChange={(e) => topicStatusMutation.mutate({ topicId: topic.id, status: e.target.value })}>
                           <option value="pending">Pending</option>
