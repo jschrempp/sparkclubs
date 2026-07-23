@@ -366,7 +366,7 @@ const ClubDetail: React.FC = () => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '12px' }}>
                       {/* Left column: Title + Description */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <h4 style={{ margin: '0 0 8px 0', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.title}</h4>
+                        <h4 style={{ margin: '0 0 8px 0', fontWeight: 'bold', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.title}</h4>
                         {topic.description && (
                           <p style={{ margin: 0, color: '#333', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.description}</p>
                         )}
