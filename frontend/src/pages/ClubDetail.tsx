@@ -392,11 +392,6 @@ const ClubDetail: React.FC = () => {
                           <span>👍 {topic.interest_counts?.interested || 0}</span>
                           <span>🎤 {topic.interest_counts?.able_to_lead || 0}</span>
                           <span>👎 {topic.interest_counts?.not_interested || 0}</span>
-                          {topic.user_interest ? (
-                            <span className="badge badge-success">My: {topic.user_interest}</span>
-                          ) : (
-                            <span className="badge badge-secondary">My: none</span>
-                          )}
                         </div>
                       </div>
                     </div>
