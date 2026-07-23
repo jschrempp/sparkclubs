@@ -682,9 +682,9 @@ class EventViewSet(viewsets.ModelViewSet):
         return [IsClubMember()]
 
     def get_queryset(self) -> Any:
-        """Filter events based on club."""
+        """Filter events based on club and optional status."""
         club_id = self.request.query_params.get("club")
-        status_filter = self.request.query_params.get("status", "active")
+        status_filter = self.request.query_params.get("status")
 
         queryset = Event.objects.select_related("club", "host").prefetch_related("event_topics__topic", "attendances")
 
