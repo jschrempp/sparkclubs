@@ -715,8 +715,8 @@ class EventViewSet(viewsets.ModelViewSet):
         event = self.get_object()
         rsvp_status = request.data.get("rsvp_status", "attending")
 
-        # Check if event is in the future
-        if event.start_datetime < timezone.now():
+        # Check if event is in the future (skip for date_voting events with no fixed date)
+        if event.start_datetime and event.start_datetime < timezone.now():
             return Response({"error": "Cannot RSVP to past events"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Check if user is member of the club
