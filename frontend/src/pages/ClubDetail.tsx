@@ -12,6 +12,7 @@ interface Topic {
   status: string;
   created_by: number;
   created_by_name: string;
+  created_at: string;
   interest_counts: { interested: number; able_to_lead: number; not_interested: number };
   user_interest: string | null;
 }
@@ -64,6 +65,8 @@ const ClubDetail: React.FC = () => {
   const [clubFormData, setClubFormData] = useState({ name: '', description: '', zip_code: '', is_public: true, auto_approve_topics: false });
   const [showEventForm, setShowEventForm] = useState(false);
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'recent' | 'interested'>('recent');
   const [eventFormData, setEventFormData] = useState({
     title: '', topic_ids: [] as number[], start_datetime: '', end_datetime: '',
     location: '', host: '', status: 'pending',
@@ -329,7 +332,16 @@ const ClubDetail: React.FC = () => {
           <div className="mt-2">
             <div className="flex-between mb-2">
               <h3>Discussion Topics</h3>
-              <button className="btn btn-primary btn-sm" onClick={() => setShowTopicForm(!showTopicForm)}>{showTopicForm ? 'Cancel' : 'Add Topic'}</button>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <button className="btn btn-link btn-sm" onClick={() => setShowHidden(!showHidden)} style={{ padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>
+                  {showHidden ? 'Hide hidden' : 'Show hidden'}
+                </button>
+                <select className="form-control" style={{ width: 'auto', fontSize: '0.85em' }} value={sortOrder} onChange={(e) => setSortOrder(e.target.value as 'recent' | 'interested')}>
+                  <option value="recent">Most recently added</option>
+                  <option value="interested">Most interested</option>
+                </select>
+                <button className="btn btn-primary btn-sm" onClick={() => setShowTopicForm(!showTopicForm)}>{showTopicForm ? 'Cancel' : 'Add Topic'}</button>
+              </div>
             </div>
 
             {showTopicForm && (
@@ -360,7 +372,17 @@ const ClubDetail: React.FC = () => {
               <p>No topics yet. Add a topic to get started!</p>
             ) : (
               <div className="topics-list">
-                {topics.map((topic: Topic) => (
+                {topics
+                  .filter((topic: Topic) => showHidden || topic.status !== 'hidden')
+                  .sort((a: Topic, b: Topic) => {
+                    if (sortOrder === 'interested') {
+                      const aTotal = (a.interest_counts?.interested || 0) + (a.interest_counts?.able_to_lead || 0);
+                      const bTotal = (b.interest_counts?.interested || 0) + (b.interest_counts?.able_to_lead || 0);
+                      return bTotal - aTotal;
+                    }
+                    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+                  })
+                  .map((topic: Topic) => (
                   <div key={topic.id} className="card mb-2" style={{ padding: '16px' }}>
                     {/* Top section: two-column layout */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '12px' }}>
