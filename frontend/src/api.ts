@@ -281,6 +281,11 @@ export const eventsAPI = {
     const response = await apiFetch(`/events/${eventId}/rsvp/`, { method: 'POST', body: { status } });
     return handleResponse(response);
   },
+
+  attendees: async (eventId: number) => {
+    const response = await apiFetch(`/events/${eventId}/attendees/`);
+    return handleResponse(response);
+  },
 };
 
 // Memberships API

@@ -71,6 +71,10 @@ const ClubDetail: React.FC = () => {
     title: '', topic_ids: [] as number[], start_datetime: '', end_datetime: '',
     location: '', host: '', status: 'pending',
   });
+  const [showAttendeesModal, setShowAttendeesModal] = useState(false);
+  const [attendees, setAttendees] = useState<{ id: number; user_name: string; user_email: string; rsvp_status: string }[]>([]);
+  const [attendeesLoading, setAttendeesLoading] = useState(false);
+  const [selectedEventTitle, setSelectedEventTitle] = useState('');
 
   const { data: club, isLoading: loading } = useQuery({
     queryKey: ['club', id],
@@ -242,6 +246,20 @@ const ClubDetail: React.FC = () => {
       location: event.location, host: String(event.host), status: event.status,
     });
     setShowEventForm(true);
+  };
+
+  const handleShowAttendees = async (eventId: number, eventTitle: string) => {
+    setSelectedEventTitle(eventTitle);
+    setShowAttendeesModal(true);
+    setAttendeesLoading(true);
+    try {
+      const data = await eventsAPI.attendees(eventId);
+      setAttendees(Array.isArray(data) ? data : []);
+    } catch {
+      setAttendees([]);
+    } finally {
+      setAttendeesLoading(false);
+    }
   };
 
   const handleDeleteClub = () => {
@@ -518,13 +536,42 @@ const ClubDetail: React.FC = () => {
                     {event.host_name && <p><strong>Host:</strong> {event.host_name}</p>}
                     {event.topics && event.topics.length > 0 && <p><strong>Topics:</strong> {event.topics.map(t => t.title).join(', ')}</p>}
                     <p><strong>Status:</strong> <span className={`badge badge-${event.status}`}>{event.status}</span></p>
-                    <p><strong>Attending:</strong> {event.attendance_count}</p>
+                    <p><strong>Attending:</strong>{' '}
+                      <button className="btn btn-link btn-sm" onClick={() => handleShowAttendees(event.id, event.title)} style={{ padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>
+                        {event.attendance_count}
+                      </button>
+                    </p>
                     <div style={{ display: 'flex', gap: '10px' }}>
                       <button className="btn btn-primary btn-sm" onClick={() => rsvpMutation.mutate(event.id)} disabled={rsvpMutation.isPending}>RSVP</button>
                       {isClubAdmin && <button className="btn btn-secondary btn-sm" onClick={() => handleEditEvent(event)}>Edit</button>}
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {showAttendeesModal && (
+              <div className="modal-overlay" onClick={() => setShowAttendeesModal(false)}>
+                <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+                  <div className="flex-between mb-2">
+                    <h3 style={{ margin: 0 }}>Attendees: {selectedEventTitle}</h3>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setShowAttendeesModal(false)}>✕</button>
+                  </div>
+                  {attendeesLoading ? (
+                    <p>Loading...</p>
+                  ) : attendees.length === 0 ? (
+                    <p>No attendees yet.</p>
+                  ) : (
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                      {attendees.map((a) => (
+                        <li key={a.id} style={{ padding: '8px 0', borderBottom: '1px solid #eee' }}>
+                          <strong>{a.user_name}</strong>
+                          <span style={{ color: '#666', marginLeft: '8px', fontSize: '0.9em' }}>{a.user_email}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             )}
           </div>
