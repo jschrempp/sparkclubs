@@ -245,7 +245,7 @@ const ClubDetail: React.FC = () => {
 
   const handleCreateOrUpdateEvent = (e: React.FormEvent) => {
     e.preventDefault();
-    const data: Record<string, unknown> = { ...eventFormData, club: id };
+    const data: Record<string, unknown> = { ...eventFormData, club: id, host: eventFormData.host || null };
     if (useDateVoting) {
       data.status = 'date_voting';
       data.date_option_dates = dateOptionDates;
