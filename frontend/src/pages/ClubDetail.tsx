@@ -374,6 +374,16 @@ const ClubDetail: React.FC = () => {
                       {/* Right column: Controls + Counts + Meta */}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          {isClubAdmin ? (
+                            <select className="form-control" style={{ width: 'auto', fontSize: '0.8em', padding: '2px 4px' }} value={topic.status} onChange={(e) => topicStatusMutation.mutate({ topicId: topic.id, status: e.target.value })}>
+                              <option value="pending">Pending</option>
+                              <option value="active">Active</option>
+                              <option value="inactive">Inactive</option>
+                              <option value="hidden">Hidden</option>
+                            </select>
+                          ) : (
+                            <span className={`badge badge-${topic.status}`}>{topic.status}</span>
+                          )}
                           {isTopicCreator(topic) && (
                             <button className="btn btn-sm btn-secondary" onClick={() => {
                               setEditingTopicId(topic.id);
@@ -398,19 +408,6 @@ const ClubDetail: React.FC = () => {
                           <span>👤 {topic.created_by_name}</span>
                         </div>
                       </div>
-                    </div>
-                    {/* Status row */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', fontSize: '0.8em', color: '#666', paddingTop: '8px' }}>
-                      {isClubAdmin ? (
-                        <select className="form-control" style={{ width: 'auto', fontSize: 'inherit', padding: '2px 4px' }} value={topic.status} onChange={(e) => topicStatusMutation.mutate({ topicId: topic.id, status: e.target.value })}>
-                          <option value="pending">Pending</option>
-                          <option value="active">Active</option>
-                          <option value="inactive">Inactive</option>
-                          <option value="hidden">Hidden</option>
-                        </select>
-                      ) : (
-                        <span className={`badge badge-${topic.status}`}>{topic.status}</span>
-                      )}
                     </div>
                   </div>
                 ))}
