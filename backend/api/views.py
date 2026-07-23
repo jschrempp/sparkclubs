@@ -16,7 +16,7 @@ from rest_framework.exceptions import ValidationError
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-from .models import User, Club, ClubMembership, Topic, TopicInterest, Event, EventAttendance, SystemSettings
+from .models import User, Club, ClubMembership, Topic, TopicInterest, Event, EventAttendance, EventDateOption, EventDateVote, SystemSettings
 from .serializers import (
     UserSerializer,
     AdminUserSerializer,
@@ -27,6 +27,7 @@ from .serializers import (
     TopicInterestSerializer,
     EventSerializer,
     EventAttendanceSerializer,
+    EventDateOptionSerializer,
     SystemSettingsSerializer,
 )
 from .permissions import IsSuperAdmin, IsSiteAdmin, IsMemberOrAdmin, IsClubAdmin, IsClubMember
@@ -686,7 +687,9 @@ class EventViewSet(viewsets.ModelViewSet):
         club_id = self.request.query_params.get("club")
         status_filter = self.request.query_params.get("status")
 
-        queryset = Event.objects.select_related("club", "host").prefetch_related("event_topics__topic", "attendances")
+        queryset = Event.objects.select_related("club", "host").prefetch_related(
+            "event_topics__topic", "attendances", "date_options__votes"
+        )
 
         if club_id:
             queryset = queryset.filter(club_id=club_id)
@@ -742,6 +745,62 @@ class EventViewSet(viewsets.ModelViewSet):
 
         attendances = event.attendances.filter(rsvp_status="attending")
         serializer = EventAttendanceSerializer(attendances, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"])
+    def vote_date(self, request: HttpRequest, pk: Any = None) -> Response:
+        """Vote for a date option on a date_voting event."""
+        event = self.get_object()
+
+        if event.status != "date_voting":
+            return Response({"error": "Date voting is not active for this event"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if user is member of the club
+        if not ClubMembership.objects.filter(club=event.club, user=request.user, status="active").exists():
+            return Response({"error": "Not a member of this club"}, status=status.HTTP_403_FORBIDDEN)
+
+        date_option_id = request.data.get("date_option_id")
+        if not date_option_id:
+            return Response({"error": "date_option_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        date_option = get_object_or_404(EventDateOption, id=date_option_id, event=event)
+
+        # Toggle vote: if already voted, remove; otherwise add
+        existing = EventDateVote.objects.filter(date_option=date_option, user=request.user).first()
+        if existing:
+            existing.delete()
+            return Response({"message": "Vote removed", "voted": False})
+        else:
+            EventDateVote.objects.create(date_option=date_option, user=request.user)
+            return Response({"message": "Vote recorded", "voted": True})
+
+    @action(detail=True, methods=["post"])
+    def select_date(self, request: HttpRequest, pk: Any = None) -> Response:
+        """Club admin selects a winning date, moving event from date_voting to pending."""
+        event = self.get_object()
+
+        if event.status != "date_voting":
+            return Response({"error": "Event is not in date voting status"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check admin permission
+        if not ClubMembership.objects.filter(club=event.club, user=request.user, status="active", is_admin=True).exists():
+            return Response({"error": "Only club admins can select a date"}, status=status.HTTP_403_FORBIDDEN)
+
+        date_option_id = request.data.get("date_option_id")
+        if not date_option_id:
+            return Response({"error": "date_option_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        date_option = get_object_or_404(EventDateOption, id=date_option_id, event=event)
+
+        event.start_datetime = date_option.start_datetime
+        event.end_datetime = date_option.end_datetime
+        event.status = "pending"
+        event.save()
+
+        # Clear all date options and votes
+        event.date_options.all().delete()
+
+        serializer = self.get_serializer(event)
         return Response(serializer.data)
 
 

@@ -286,6 +286,16 @@ export const eventsAPI = {
     const response = await apiFetch(`/events/${eventId}/attendees/`);
     return handleResponse(response);
   },
+
+  voteDate: async (eventId: number, dateOptionId: number) => {
+    const response = await apiFetch(`/events/${eventId}/vote_date/`, { method: 'POST', body: { date_option_id: dateOptionId } });
+    return handleResponse(response);
+  },
+
+  selectDate: async (eventId: number, dateOptionId: number) => {
+    const response = await apiFetch(`/events/${eventId}/select_date/`, { method: 'POST', body: { date_option_id: dateOptionId } });
+    return handleResponse(response);
+  },
 };
 
 // Memberships API

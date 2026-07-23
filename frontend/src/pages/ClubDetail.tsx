@@ -20,14 +20,15 @@ interface Topic {
 interface Event {
   id: number;
   title: string;
-  start_datetime: string;
-  end_datetime: string;
+  start_datetime: string | null;
+  end_datetime: string | null;
   location: string;
   host: number;
   host_name: string;
   status: string;
   topics: { id: number; title: string }[];
   attendance_count: number;
+  date_options: { id: number; start_datetime: string; end_datetime: string; vote_count: number; user_voted: boolean }[];
 }
 
 interface Member {
@@ -71,6 +72,8 @@ const ClubDetail: React.FC = () => {
     title: '', topic_ids: [] as number[], start_datetime: '', end_datetime: '',
     location: '', host: '', status: 'pending',
   });
+  const [useDateVoting, setUseDateVoting] = useState(false);
+  const [dateOptionDates, setDateOptionDates] = useState<{ start_datetime: string; end_datetime: string }[]>([]);
   const [showAttendeesModal, setShowAttendeesModal] = useState(false);
   const [attendees, setAttendees] = useState<{ id: number; user_name: string; user_email: string; rsvp_status: string }[]>([]);
   const [attendeesLoading, setAttendeesLoading] = useState(false);
@@ -195,9 +198,25 @@ const ClubDetail: React.FC = () => {
       alert(editingEventId ? 'Event updated!' : 'Event created!');
       setShowEventForm(false);
       setEditingEventId(null);
+      setUseDateVoting(false);
+      setDateOptionDates([]);
       setEventFormData({ title: '', topic_ids: [], start_datetime: '', end_datetime: '', location: '', host: '', status: 'pending' });
       invalidateAll();
     },
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const voteDateMutation = useMutation({
+    mutationFn: ({ eventId, dateOptionId }: { eventId: number; dateOptionId: number }) =>
+      eventsAPI.voteDate(eventId, dateOptionId),
+    onSuccess: () => invalidateAll(),
+    onError: (err: Error) => alert(err.message),
+  });
+
+  const selectDateMutation = useMutation({
+    mutationFn: ({ eventId, dateOptionId }: { eventId: number; dateOptionId: number }) =>
+      eventsAPI.selectDate(eventId, dateOptionId),
+    onSuccess: () => { alert('Date selected! Event moved to Pending.'); invalidateAll(); },
     onError: (err: Error) => alert(err.message),
   });
 
@@ -226,14 +245,23 @@ const ClubDetail: React.FC = () => {
 
   const handleCreateOrUpdateEvent = (e: React.FormEvent) => {
     e.preventDefault();
+    const data: Record<string, unknown> = { ...eventFormData, club: id };
+    if (useDateVoting) {
+      data.status = 'date_voting';
+      data.date_option_dates = dateOptionDates;
+      // Clear single date fields when using date voting
+      data.start_datetime = null;
+      data.end_datetime = null;
+    }
     eventMutation.mutate({
       eventId: editingEventId ?? undefined,
-      data: { ...eventFormData, club: id },
+      data,
     });
   };
 
   const handleEditEvent = (event: Event) => {
-    const toDatetimeLocal = (iso: string) => {
+    const toDatetimeLocal = (iso: string | null) => {
+      if (!iso) return '';
       const d = new Date(iso);
       const pad = (n: number) => String(n).padStart(2, '0');
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -245,6 +273,16 @@ const ClubDetail: React.FC = () => {
       end_datetime: toDatetimeLocal(event.end_datetime),
       location: event.location, host: String(event.host), status: event.status,
     });
+    if (event.status === 'date_voting' && event.date_options) {
+      setUseDateVoting(true);
+      setDateOptionDates(event.date_options.map(o => ({
+        start_datetime: toDatetimeLocal(o.start_datetime),
+        end_datetime: toDatetimeLocal(o.end_datetime),
+      })));
+    } else {
+      setUseDateVoting(false);
+      setDateOptionDates([]);
+    }
     setShowEventForm(true);
   };
 
@@ -486,14 +524,40 @@ const ClubDetail: React.FC = () => {
                     </select>
                     <small>Hold Ctrl (Cmd on Mac) to select multiple</small>
                   </div>
+
                   <div className="form-group">
-                    <label>Start Date/Time *</label>
-                    <input type="datetime-local" className="form-control" value={eventFormData.start_datetime} onChange={(e) => setEventFormData({...eventFormData, start_datetime: e.target.value})} required />
+                    <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={useDateVoting} onChange={(e) => setUseDateVoting(e.target.checked)} style={{ marginRight: '10px', width: '20px', height: '20px' }} />
+                      <span><strong>Date Voting</strong><span style={{ display: 'block', fontSize: '0.9rem', color: '#666' }}>Let members vote on multiple date options instead of setting a single date.</span></span>
+                    </label>
                   </div>
-                  <div className="form-group">
-                    <label>End Date/Time *</label>
-                    <input type="datetime-local" className="form-control" value={eventFormData.end_datetime} onChange={(e) => setEventFormData({...eventFormData, end_datetime: e.target.value})} required />
-                  </div>
+
+                  {useDateVoting ? (
+                    <div className="form-group">
+                      <label>Date Options</label>
+                      {dateOptionDates.map((opt, i) => (
+                        <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: '8px', alignItems: 'center' }}>
+                          <input type="datetime-local" className="form-control" value={opt.start_datetime} onChange={(e) => { const updated = [...dateOptionDates]; updated[i] = { ...updated[i], start_datetime: e.target.value }; setDateOptionDates(updated); }} required />
+                          <span>to</span>
+                          <input type="datetime-local" className="form-control" value={opt.end_datetime} onChange={(e) => { const updated = [...dateOptionDates]; updated[i] = { ...updated[i], end_datetime: e.target.value }; setDateOptionDates(updated); }} required />
+                          <button type="button" className="btn btn-danger btn-sm" onClick={() => setDateOptionDates(dateOptionDates.filter((_, j) => j !== i))}>✕</button>
+                        </div>
+                      ))}
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setDateOptionDates([...dateOptionDates, { start_datetime: '', end_datetime: '' }])}>+ Add Date Option</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="form-group">
+                        <label>Start Date/Time *</label>
+                        <input type="datetime-local" className="form-control" value={eventFormData.start_datetime} onChange={(e) => setEventFormData({...eventFormData, start_datetime: e.target.value})} required />
+                      </div>
+                      <div className="form-group">
+                        <label>End Date/Time *</label>
+                        <input type="datetime-local" className="form-control" value={eventFormData.end_datetime} onChange={(e) => setEventFormData({...eventFormData, end_datetime: e.target.value})} required />
+                      </div>
+                    </>
+                  )}
+
                   <div className="form-group">
                     <label>Location *</label>
                     <textarea className="form-control" value={eventFormData.location} onChange={(e) => setEventFormData({...eventFormData, location: e.target.value})} rows={2} required />
@@ -511,6 +575,7 @@ const ClubDetail: React.FC = () => {
                     <label>Status</label>
                     <select className="form-control" value={eventFormData.status} onChange={(e) => setEventFormData({...eventFormData, status: e.target.value})}>
                       <option value="pending">Pending</option>
+                      <option value="date_voting">Date Voting</option>
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
                       <option value="cancelled">Cancelled</option>
@@ -519,7 +584,7 @@ const ClubDetail: React.FC = () => {
                   <button type="submit" className="btn btn-primary" disabled={eventMutation.isPending}>
                     {eventMutation.isPending ? 'Saving...' : editingEventId ? 'Update Event' : 'Create Event'}
                   </button>
-                  <button type="button" className="btn btn-secondary" onClick={() => { setShowEventForm(false); setEditingEventId(null); setEventFormData({ title: '', topic_ids: [], start_datetime: '', end_datetime: '', location: '', host: '', status: 'pending' }); }} style={{ marginLeft: '10px' }}>Cancel</button>
+                  <button type="button" className="btn btn-secondary" onClick={() => { setShowEventForm(false); setEditingEventId(null); setUseDateVoting(false); setDateOptionDates([]); setEventFormData({ title: '', topic_ids: [], start_datetime: '', end_datetime: '', location: '', host: '', status: 'pending' }); }} style={{ marginLeft: '10px' }}>Cancel</button>
                 </form>
               </div>
             )}
@@ -531,11 +596,44 @@ const ClubDetail: React.FC = () => {
                 {events.map((event: Event) => (
                   <div key={event.id} className="card mb-2">
                     <h4>{event.title}</h4>
-                    <p><strong>Date:</strong> {new Date(event.start_datetime).toLocaleString()}</p>
+                    {event.start_datetime && <p><strong>Date:</strong> {new Date(event.start_datetime).toLocaleString()}</p>}
                     <p><strong>Location:</strong> {event.location}</p>
                     {event.host_name && <p><strong>Host:</strong> {event.host_name}</p>}
                     {event.topics && event.topics.length > 0 && <p><strong>Topics:</strong> {event.topics.map(t => t.title).join(', ')}</p>}
                     <p><strong>Status:</strong> <span className={`badge badge-${event.status}`}>{event.status}</span></p>
+
+                    {event.status === 'date_voting' && event.date_options && event.date_options.length > 0 && (
+                      <div style={{ margin: '10px 0', padding: '10px', background: '#f8f9fa', borderRadius: '4px' }}>
+                        <strong>Date Options (vote for your preferred):</strong>
+                        <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0 0' }}>
+                          {event.date_options.map(opt => (
+                            <li key={opt.id} style={{ padding: '6px 0', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>{new Date(opt.start_datetime).toLocaleString()} – {new Date(opt.end_datetime).toLocaleTimeString()}</span>
+                              <span style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <span style={{ fontSize: '0.85em', color: '#666' }}>{opt.vote_count} vote{opt.vote_count !== 1 ? 's' : ''}</span>
+                                <button
+                                  className={`btn btn-sm ${opt.user_voted ? 'btn-primary' : 'btn-secondary'}`}
+                                  onClick={() => voteDateMutation.mutate({ eventId: event.id, dateOptionId: opt.id })}
+                                  disabled={voteDateMutation.isPending}
+                                >
+                                  {opt.user_voted ? '✓ Voted' : 'Vote'}
+                                </button>
+                                {isClubAdmin && (
+                                  <button
+                                    className="btn btn-sm btn-success"
+                                    onClick={() => { if (window.confirm('Select this date and move event to Pending?')) selectDateMutation.mutate({ eventId: event.id, dateOptionId: opt.id }); }}
+                                    disabled={selectDateMutation.isPending}
+                                  >
+                                    Select
+                                  </button>
+                                )}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     <p><strong>Attending:</strong>{' '}
                       <button className="btn btn-link btn-sm" onClick={() => handleShowAttendees(event.id, event.title)} style={{ padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>
                         {event.attendance_count}

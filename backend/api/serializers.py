@@ -3,7 +3,7 @@
 from typing import Any, Optional
 
 from rest_framework import serializers
-from .models import User, Club, ClubMembership, Topic, TopicInterest, Event, EventTopic, EventAttendance, SystemSettings
+from .models import User, Club, ClubMembership, Topic, TopicInterest, Event, EventTopic, EventAttendance, EventDateOption, SystemSettings
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -248,6 +248,27 @@ class TopicInterestSerializer(serializers.ModelSerializer):
         return f"{obj.user.first_name} {obj.user.last_name}"
 
 
+class EventDateOptionSerializer(serializers.ModelSerializer):
+    """Serializer for EventDateOption model."""
+
+    vote_count = serializers.SerializerMethodField()
+    user_voted = serializers.SerializerMethodField()
+
+    class Meta:
+        model = EventDateOption
+        fields = ["id", "event", "start_datetime", "end_datetime", "vote_count", "user_voted", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+    def get_vote_count(self, obj: EventDateOption) -> int:
+        return obj.votes.count()
+
+    def get_user_voted(self, obj: EventDateOption) -> bool:
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return obj.votes.filter(user=request.user).exists()
+        return False
+
+
 class EventSerializer(serializers.ModelSerializer):
     """Serializer for Event model."""
 
@@ -255,11 +276,18 @@ class EventSerializer(serializers.ModelSerializer):
     topics = serializers.SerializerMethodField()
     club_name = serializers.CharField(source="club.name", read_only=True)
     attendance_count = serializers.SerializerMethodField()
+    date_options = EventDateOptionSerializer(many=True, read_only=True)
     topic_ids = serializers.ListField(
         child=serializers.IntegerField(),
         write_only=True,
         required=False,
         help_text="List of topic IDs to associate with this event",
+    )
+    date_option_dates = serializers.ListField(
+        child=serializers.DictField(),
+        write_only=True,
+        required=False,
+        help_text="List of {start_datetime, end_datetime} dicts for date_voting events",
     )
 
     class Meta:
@@ -281,6 +309,8 @@ class EventSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "attendance_count",
+            "date_options",
+            "date_option_dates",
         ]
         read_only_fields = ["id", "created_at", "updated_at", "created_by"]
 
@@ -305,26 +335,45 @@ class EventSerializer(serializers.ModelSerializer):
         return obj.attendances.filter(rsvp_status="attending").count()
 
     def validate(self, data: dict[str, Any]) -> dict[str, Any]:
-        """Validate that end_datetime is after start_datetime."""
-        if data.get("end_datetime") and data.get("start_datetime"):
-            if data["end_datetime"] <= data["start_datetime"]:
-                raise serializers.ValidationError({"end_datetime": "End time must be after start time."})
+        """Validate that end_datetime is after start_datetime when both are provided."""
+        start = data.get("start_datetime")
+        end = data.get("end_datetime")
+        if start and end and end <= start:
+            raise serializers.ValidationError({"end_datetime": "End time must be after start time."})
         return data
 
     def create(self, validated_data: dict[str, Any]) -> Event:
-        """Create event and associate topics."""
+        """Create event and associate topics and date options."""
         topic_ids = validated_data.pop("topic_ids", [])
+        date_option_dates = validated_data.pop("date_option_dates", [])
+
         event = Event.objects.create(**validated_data)
 
         # Create EventTopic relationships
         for topic_id in topic_ids:
             EventTopic.objects.create(event=event, topic_id=topic_id)
 
+        # Create date options if provided
+        for date_data in date_option_dates:
+            EventDateOption.objects.create(
+                event=event,
+                start_datetime=date_data["start_datetime"],
+                end_datetime=date_data["end_datetime"],
+            )
+
         return event
 
     def update(self, instance: Event, validated_data: dict[str, Any]) -> Event:
-        """Update event and associated topics."""
+        """Update event and associated topics and date options."""
         topic_ids = validated_data.pop("topic_ids", None)
+        date_option_dates = validated_data.pop("date_option_dates", None)
+
+        # If a specific start/end datetime is being set and event was in date_voting,
+        # transition back to pending
+        new_status = validated_data.get("status", instance.status)
+        new_start = validated_data.get("start_datetime", instance.start_datetime)
+        if instance.status == "date_voting" and new_start and new_status == "date_voting":
+            validated_data["status"] = "pending"
 
         # Update event fields
         for attr, value in validated_data.items():
@@ -333,11 +382,19 @@ class EventSerializer(serializers.ModelSerializer):
 
         # Update topics if provided
         if topic_ids is not None:
-            # Remove existing topics
             instance.event_topics.all().delete()
-            # Add new topics
             for topic_id in topic_ids:
                 EventTopic.objects.create(event=instance, topic_id=topic_id)
+
+        # Update date options if provided
+        if date_option_dates is not None:
+            instance.date_options.all().delete()
+            for date_data in date_option_dates:
+                EventDateOption.objects.create(
+                    event=instance,
+                    start_datetime=date_data["start_datetime"],
+                    end_datetime=date_data["end_datetime"],
+                )
 
         return instance
 

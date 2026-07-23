@@ -177,6 +177,11 @@ body {
   color: #000;
 }
 
+.badge-date_voting {
+  background-color: #6f42c1;
+  color: white;
+}
+
 .badge-active {
   background-color: #28a745;
   color: white;
@@ -184,6 +189,11 @@ body {
 
 .badge-inactive {
   background-color: #6c757d;
+  color: white;
+}
+
+.badge-cancelled {
+  background-color: #dc3545;
   color: white;
 }
 

@@ -219,6 +219,7 @@ class Event(models.Model):
 
     STATUS_CHOICES = [
         ("pending", "Pending"),
+        ("date_voting", "Date Voting"),
         ("active", "Active"),
         ("inactive", "Inactive"),
         ("cancelled", "Cancelled"),
@@ -226,8 +227,8 @@ class Event(models.Model):
 
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="events")
     title = models.CharField(max_length=200)
-    start_datetime = models.DateTimeField()
-    end_datetime = models.DateTimeField()
+    start_datetime = models.DateTimeField(null=True, blank=True)
+    end_datetime = models.DateTimeField(null=True, blank=True)
     location = models.TextField()
     host = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="hosted_events")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
@@ -284,6 +285,37 @@ class EventAttendance(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.email} - {self.event.title} ({self.rsvp_status})"
+
+
+class EventDateOption(models.Model):
+    """A proposed date/time option for an event in date_voting status."""
+
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="date_options")
+    start_datetime = models.DateTimeField()
+    end_datetime = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "event_date_options"
+        ordering = ["start_datetime"]
+
+    def __str__(self) -> str:
+        return f"{self.event.title} - {self.start_datetime}"
+
+
+class EventDateVote(models.Model):
+    """A member's vote for a date option."""
+
+    date_option = models.ForeignKey(EventDateOption, on_delete=models.CASCADE, related_name="votes")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="date_votes")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "event_date_votes"
+        unique_together = [["date_option", "user"]]
+
+    def __str__(self) -> str:
+        return f"{self.user.email} voted for {self.date_option}"
 
 
 class SystemSettings(models.Model):
