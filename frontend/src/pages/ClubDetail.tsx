@@ -229,10 +229,16 @@ const ClubDetail: React.FC = () => {
   };
 
   const handleEditEvent = (event: Event) => {
+    const toDatetimeLocal = (iso: string) => {
+      const d = new Date(iso);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
     setEditingEventId(event.id);
     setEventFormData({
       title: event.title, topic_ids: event.topics ? event.topics.map(t => t.id) : [],
-      start_datetime: event.start_datetime, end_datetime: event.end_datetime,
+      start_datetime: toDatetimeLocal(event.start_datetime),
+      end_datetime: toDatetimeLocal(event.end_datetime),
       location: event.location, host: String(event.host), status: event.status,
     });
     setShowEventForm(true);
