@@ -318,3 +318,14 @@ export const systemSettingsAPI = {
     return handleResponse(response);
   },
 };
+
+// Test Email API (site admin only)
+export const testEmailAPI = {
+  send: async (toEmail: string, subject: string, body: string) => {
+    const response = await apiFetch('/test-email/', {
+      method: 'POST',
+      body: { to_email: toEmail, subject, body },
+    });
+    return handleResponse(response);
+  },
+};

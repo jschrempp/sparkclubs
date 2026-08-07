@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { usersAPI, systemSettingsAPI } from '../api';
+import { usersAPI, systemSettingsAPI, testEmailAPI } from '../api';
 
 interface User {
   id: number;
@@ -98,6 +98,32 @@ const Admin: React.FC = () => {
     increaseClubLimitMutation.mutate(userId);
   };
 
+  // Test email state
+  const [testEmailTo, setTestEmailTo] = useState('');
+  const [testEmailSubject, setTestEmailSubject] = useState('Test from SparkClubs');
+  const [testEmailBody, setTestEmailBody] = useState('A site admin sent this test email from SparkClubs');
+  const [testEmailResult, setTestEmailResult] = useState<string | null>(null);
+
+  const testEmailMutation = useMutation({
+    mutationFn: ({ to, subject, body }: { to: string; subject: string; body: string }) =>
+      testEmailAPI.send(to, subject, body),
+    onSuccess: (data) => {
+      setTestEmailResult(`✅ ${data.message}`);
+    },
+    onError: (err: Error) => {
+      setTestEmailResult(`❌ ${err.message}`);
+    },
+  });
+
+  const handleSendTestEmail = () => {
+    if (!testEmailTo.trim()) {
+      setTestEmailResult('❌ Please enter a destination email address');
+      return;
+    }
+    setTestEmailResult(null);
+    testEmailMutation.mutate({ to: testEmailTo, subject: testEmailSubject, body: testEmailBody });
+  };
+
   if (loading) return <div className="loading">Loading users...</div>;
 
   const renderClubMemberships = (memberships: User['club_memberships']) => {
@@ -136,6 +162,62 @@ const Admin: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Test Email Card */}
+      <div className="card" style={{ marginBottom: '20px', backgroundColor: '#f8f9fa' }}>
+        <h2 style={{ fontSize: '1.2rem', marginBottom: '15px' }}>Send Test Email</h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600, fontSize: '0.9rem' }}>
+              Destination Email
+            </label>
+            <input
+              type="email"
+              className="form-control"
+              placeholder="recipient@example.com"
+              value={testEmailTo}
+              onChange={(e) => setTestEmailTo(e.target.value)}
+              style={{ width: '100%', maxWidth: '400px' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600, fontSize: '0.9rem' }}>
+              Subject
+            </label>
+            <input
+              type="text"
+              className="form-control"
+              value={testEmailSubject}
+              onChange={(e) => setTestEmailSubject(e.target.value)}
+              style={{ width: '100%', maxWidth: '400px' }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '4px', fontWeight: 600, fontSize: '0.9rem' }}>
+              Body
+            </label>
+            <textarea
+              className="form-control"
+              rows={4}
+              value={testEmailBody}
+              onChange={(e) => setTestEmailBody(e.target.value)}
+              style={{ width: '100%', maxWidth: '400px', resize: 'vertical' }}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              className="btn btn-primary"
+              onClick={handleSendTestEmail}
+              disabled={testEmailMutation.isPending}
+            >
+              {testEmailMutation.isPending ? 'Sending...' : 'Send Test Email'}
+            </button>
+            {testEmailResult && (
+              <span style={{ fontSize: '0.9rem', fontWeight: 500 }}>{testEmailResult}</span>
+            )}
+          </div>
+        </div>
+      </div>
       
       <div className="card">
         <table className="table">

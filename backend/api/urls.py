@@ -24,6 +24,8 @@ urlpatterns = [
     path("auth/my-events/", views.MyEventsView.as_view(), name="my-events"),
     # System settings (super admin only)
     path("system-settings/", views.SystemSettingsView.as_view(), name="system-settings"),
+    # Test email (site admin only)
+    path("test-email/", views.TestEmailView.as_view(), name="test-email"),
     # Router URLs
     path("", include(router.urls)),
 ]

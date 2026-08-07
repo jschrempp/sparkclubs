@@ -32,7 +32,7 @@ from .serializers import (
 )
 from .permissions import IsSuperAdmin, IsSiteAdmin, IsMemberOrAdmin, IsClubAdmin, IsClubMember
 from .authentication import generate_token_pair, set_refresh_cookie, clear_refresh_cookie, REFRESH_COOKIE_NAME
-from .tasks import send_join_request_alert, send_membership_approved_alert, send_member_removed_alert
+from .tasks import send_join_request_alert, send_membership_approved_alert, send_member_removed_alert, send_test_email
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
@@ -843,6 +843,33 @@ class EventViewSet(viewsets.ModelViewSet):
 
 
 # ────────────────────────── System Settings Views ─────────────────────────
+
+
+class TestEmailView(APIView):
+    """Send a test email (site admin only)."""
+
+    permission_classes = [IsSiteAdmin]
+
+    def post(self, request: HttpRequest) -> Response:
+        to_email = request.data.get("to_email", "").strip()
+        subject = request.data.get("subject", "Test from SparkClubs").strip()
+        body = request.data.get("body", "A site admin sent this test email from SparkClubs").strip()
+
+        if not to_email:
+            return Response({"error": "to_email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not subject:
+            return Response({"error": "subject is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            send_test_email.delay(to_email, subject, body)
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to queue test email: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response({"message": f"Test email queued for delivery to {to_email}"})
 
 
 class SystemSettingsView(APIView):

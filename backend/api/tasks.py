@@ -125,3 +125,34 @@ def send_member_removed_alert(club_name: str, user_email: str, user_first_name: 
     except Exception as e:
         logger.error(f"Failed to send removal alert to {user_email}: {e}")
         raise
+
+
+@shared_task(rate_limit="10/m", max_retries=2, default_retry_delay=30)
+def send_test_email(to_email: str, subject: str, body: str) -> None:
+    """Send a test email (used by site admins to verify email configuration)."""
+    if not settings.RESEND_API_KEY:
+        logger.error("No Resend API key configured — cannot send test email")
+        raise ValueError("Resend API key is not configured")
+
+    try:
+        resend.Emails.send({
+            "from": f"Spark Clubs <{settings.DEFAULT_FROM_EMAIL}>",
+            "to": [to_email],
+            "subject": subject,
+            "html": f"""
+<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+  <h2>Test Email from Spark Clubs</h2>
+  <div style="background:#f5f5f5;padding:16px;border-radius:8px;margin:16px 0">
+    <p style="white-space:pre-wrap;margin:0">{body}</p>
+  </div>
+  <hr>
+  <p style="color:#888;font-size:12px">This is a test email sent by a Spark Clubs site administrator.</p>
+</div>
+""",
+        })
+
+        logger.info(f"Test email sent to {to_email}")
+
+    except Exception as e:
+        logger.error(f"Failed to send test email to {to_email}: {e}")
+        raise
