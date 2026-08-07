@@ -275,7 +275,7 @@ class MyEventsView(APIView):
         )
         events = [attendance.event for attendance in attendances]
         now = timezone.now()
-        events = [event for event in events if event.start_datetime >= now]
+        events = [event for event in events if event.start_datetime is not None and event.start_datetime >= now]
         events.sort(key=lambda e: e.start_datetime)
 
         serializer = EventSerializer(events, many=True)
