@@ -233,7 +233,7 @@ FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
 # Celery Configuration
 # Railway injects REDIS_URL when you add a Redis database to your project.
 # Use it automatically as the Celery broker; fall back to CELERY_BROKER_URL or localhost.
-_RAILWAY_REDIS_URL = env('REDIS_URL', default=None)
+_RAILWAY_REDIS_URL = env('REDIS_URL', default='')
 _DEFAULT_REDIS = 'redis://localhost:6379/0'
 
 CELERY_BROKER_URL = env('CELERY_BROKER_URL', default=_RAILWAY_REDIS_URL or _DEFAULT_REDIS)
