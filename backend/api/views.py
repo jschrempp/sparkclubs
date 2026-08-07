@@ -32,6 +32,7 @@ from .serializers import (
 )
 from .permissions import IsSuperAdmin, IsSiteAdmin, IsMemberOrAdmin, IsClubAdmin, IsClubMember
 from .authentication import generate_token_pair, set_refresh_cookie, clear_refresh_cookie, REFRESH_COOKIE_NAME
+from .tasks import send_join_request_alert, send_membership_approved_alert, send_member_removed_alert
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
@@ -205,10 +206,28 @@ class LogoutView(APIView):
 
 
 class MeView(APIView):
-    """Get current user's profile."""
+    """Get or update current user's profile."""
 
     def get(self, request: HttpRequest) -> Response:
         return Response(UserSerializer(request.user).data)
+
+    def patch(self, request: HttpRequest) -> Response:
+        """Update current user's profile fields (e.g., email_notifications_enabled)."""
+        allowed_fields = {"email_notifications_enabled", "first_name", "last_name", "zip_code", "bio"}
+        update_data = {k: v for k, v in request.data.items() if k in allowed_fields}
+
+        if not update_data:
+            return Response({"error": "No valid fields to update"}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = UserSerializer(request.user, data=update_data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(
+            {"error": "Invalid data", "details": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
 
 class ChangePasswordView(APIView):
@@ -482,6 +501,15 @@ class ClubViewSet(viewsets.ModelViewSet):
 
         membership = ClubMembership.objects.create(club=club, user=request.user, status=membership_status)
 
+        # If manual approval is needed, notify club admins via email
+        if membership_status == "pending":
+            admin_ids = list(
+                club.memberships.filter(is_admin=True, status="active")
+                .values_list("user_id", flat=True)
+            )
+            if admin_ids:
+                send_join_request_alert.delay(club.id, request.user.id, admin_ids)
+
         return Response(ClubMembershipSerializer(membership).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"])
@@ -518,6 +546,9 @@ class ClubMembershipViewSet(viewsets.ModelViewSet):
         membership.status = "active"
         membership.save()
 
+        # Notify the member that they were approved
+        send_membership_approved_alert.delay(membership.id)
+
         return Response(ClubMembershipSerializer(membership).data)
 
     @action(detail=True, methods=["post"])
@@ -526,6 +557,13 @@ class ClubMembershipViewSet(viewsets.ModelViewSet):
         membership = self.get_object()
         membership.status = "removed"
         membership.save()
+
+        # Notify the member they were removed
+        send_member_removed_alert.delay(
+            club_name=membership.club.name,
+            user_email=membership.user.email,
+            user_first_name=membership.user.first_name,
+        )
 
         return Response(ClubMembershipSerializer(membership).data)
 

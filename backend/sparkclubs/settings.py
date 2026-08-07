@@ -267,3 +267,8 @@ LOGGING = {
 
 # OpenAI Settings
 OPENAI_API_KEY = env('OPENAI_API_KEY', default='')
+
+# Resend Email Settings
+RESEND_API_KEY = env('RESEND_API_KEY', default='')
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@sparkclubs.com')
+EMAIL_ENABLED = env.bool('EMAIL_ENABLED', default=not DEBUG)  # auto-enable in production

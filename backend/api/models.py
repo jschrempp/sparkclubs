@@ -48,6 +48,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default="pending")
     google_id = models.CharField(max_length=255, unique=True, blank=True, null=True)
     club_creation_limit = models.IntegerField(default=5, help_text="Maximum number of clubs this user can create")
+    email_notifications_enabled = models.BooleanField(
+        default=True, help_text="Whether the user wants to receive email alerts"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     last_login = models.DateTimeField(null=True, blank=True)
