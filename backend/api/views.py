@@ -846,7 +846,7 @@ class EventViewSet(viewsets.ModelViewSet):
 
 
 class TestEmailView(APIView):
-    """Send a test email (site admin only)."""
+    """Send a test email via Celery (site admin only)."""
 
     permission_classes = [IsSiteAdmin]
 
@@ -860,6 +860,12 @@ class TestEmailView(APIView):
 
         if not subject:
             return Response({"error": "subject is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not settings.RESEND_API_KEY:
+            return Response(
+                {"error": "Resend API key is not configured. Set RESEND_API_KEY environment variable."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         try:
             send_test_email.delay(to_email, subject, body)

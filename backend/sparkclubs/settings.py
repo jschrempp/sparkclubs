@@ -231,8 +231,13 @@ SIMPLE_JWT = {
 FRONTEND_URL = env('FRONTEND_URL', default='http://localhost:3000')
 
 # Celery Configuration
-CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
+# Railway injects REDIS_URL when you add a Redis database to your project.
+# Use it automatically as the Celery broker; fall back to CELERY_BROKER_URL or localhost.
+_RAILWAY_REDIS_URL = env('REDIS_URL', default=None)
+_DEFAULT_REDIS = 'redis://localhost:6379/0'
+
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default=_RAILWAY_REDIS_URL or _DEFAULT_REDIS)
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default=_RAILWAY_REDIS_URL or _DEFAULT_REDIS)
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
