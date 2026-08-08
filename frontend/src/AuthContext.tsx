@@ -46,6 +46,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // On app load there is no in-memory access token yet (it doesn't survive
     // a page reload by design). Attempt a silent refresh using the HttpOnly
     // refresh cookie to see if the user already has an active session.
+    // Skip the refresh on the login page — there's no session to restore and
+    // the 401 response would show a confusing error in the browser console.
+    if (window.location.pathname === '/login') {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     (async () => {
