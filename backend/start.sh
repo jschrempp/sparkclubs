@@ -11,7 +11,9 @@ python manage.py create_default_superadmin
 # Start Celery worker in the background (if Redis is configured)
 if [ -n "$REDIS_URL" ] || [ -n "$CELERY_BROKER_URL" ]; then
   echo "Starting Celery worker..."
-  celery -A sparkclubs worker --loglevel=info --concurrency=1 &
+  python -m celery -A sparkclubs worker --loglevel=info --concurrency=1 &
+  CELERY_PID=$!
+  echo "Celery worker started with PID $CELERY_PID"
 fi
 
 # Start gunicorn

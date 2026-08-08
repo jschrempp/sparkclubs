@@ -879,17 +879,23 @@ class TestEmailView(APIView):
 
 
 class SystemSettingsView(APIView):
-    """Get or update system settings (super admin only)."""
+    """Get or update system settings (site admin+ for read, super admin only for write)."""
 
-    def _check_super_admin(self, request: HttpRequest) -> Optional[Response]:
-        if request.user.user_type != "super_admin":
+    permission_classes = [IsAuthenticated]
+
+    def _check_access(self, request: HttpRequest, write: bool = False) -> Optional[Response]:
+        if write and request.user.user_type != "super_admin":
             return Response(
                 {"error": "Permission denied. Super admin access required."}, status=status.HTTP_403_FORBIDDEN
+            )
+        if not request.user.is_site_admin():
+            return Response(
+                {"error": "Permission denied. Site admin access required."}, status=status.HTTP_403_FORBIDDEN
             )
         return None
 
     def get(self, request: HttpRequest) -> Response:
-        denied = self._check_super_admin(request)
+        denied = self._check_access(request)
         if denied:
             return denied
 
@@ -898,7 +904,7 @@ class SystemSettingsView(APIView):
         return Response(serializer.data)
 
     def patch(self, request: HttpRequest) -> Response:
-        denied = self._check_super_admin(request)
+        denied = self._check_access(request, write=True)
         if denied:
             return denied
 
