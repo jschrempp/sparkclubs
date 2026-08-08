@@ -243,6 +243,17 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
+# Keep Redis connections alive on Railway
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_HEARTBEAT = 30  # send heartbeat every 30s to keep connection alive
+CELERY_BROKER_POOL_LIMIT = 1  # single connection, avoids idle connection drops
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    'visibility_timeout': 3600,  # 1 hour to process tasks
+    'socket_keepalive': True,
+    'socket_connect_timeout': 10,
+    'retry_on_timeout': True,
+}
+
 # Logging configuration for production debugging
 LOGGING = {
     'version': 1,
@@ -276,4 +287,5 @@ OPENAI_API_KEY = env('OPENAI_API_KEY', default='')
 # Resend Email Settings
 RESEND_API_KEY = env('RESEND_API_KEY', default='')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@sparkclubs.com')
+DEFAULT_REPLY_TO_EMAIL = env('DEFAULT_REPLY_TO_EMAIL', default='')
 EMAIL_ENABLED = env.bool('EMAIL_ENABLED', default=not DEBUG)  # auto-enable in production

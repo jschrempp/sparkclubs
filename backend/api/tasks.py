@@ -11,6 +11,17 @@ logger = logging.getLogger(__name__)
 resend.api_key = settings.RESEND_API_KEY
 
 
+def _build_email_params(**overrides: object) -> dict[str, object]:
+    """Build a Resend email params dict with common defaults (from, reply_to)."""
+    params: dict[str, object] = {
+        "from": f"Spark Clubs <{settings.DEFAULT_FROM_EMAIL}>",
+    }
+    if settings.DEFAULT_REPLY_TO_EMAIL:
+        params["reply_to"] = settings.DEFAULT_REPLY_TO_EMAIL
+    params.update(overrides)
+    return params
+
+
 @shared_task(rate_limit="30/m", max_retries=3, default_retry_delay=60)
 def send_join_request_alert(club_id: int, requesting_user_id: int, admin_ids: list[int]) -> None:
     """Notify all club admins that someone wants to join their club.
@@ -35,11 +46,10 @@ def send_join_request_alert(club_id: int, requesting_user_id: int, admin_ids: li
         admin_emails = [{"to": a.email} for a in admins]
         requester_name = f"{requesting_user.first_name} {requesting_user.last_name}"
 
-        resend.Emails.send({
-            "from": f"Spark Clubs <{settings.DEFAULT_FROM_EMAIL}>",
-            "to": admin_emails,
-            "subject": f"{requester_name} wants to join {club.name}",
-            "html": f"""
+        resend.Emails.send(_build_email_params(
+            to=admin_emails,
+            subject=f"{requester_name} wants to join {club.name}",
+            html=f"""
 <h2>New Join Request</h2>
 <p><strong>{requester_name}</strong> ({requesting_user.email}) has requested to join <strong>{club.name}</strong>.</p>
 <p>Please review this request in your club dashboard.</p>
@@ -47,7 +57,7 @@ def send_join_request_alert(club_id: int, requesting_user_id: int, admin_ids: li
 <hr>
 <p style="color:#888;font-size:12px">Spark Clubs — Sent because you are an admin of {club.name}.</p>
 """,
-        })
+        ))
 
         logger.info(f"Join request alert sent to {len(admins)} admin(s) for club '{club.name}'")
 
@@ -77,11 +87,10 @@ def send_membership_approved_alert(membership_id: int) -> None:
 
         club = membership.club
 
-        resend.Emails.send({
-            "from": f"Spark Clubs <{settings.DEFAULT_FROM_EMAIL}>",
-            "to": [user.email],
-            "subject": f"You've been approved for {club.name}!",
-            "html": f"""
+        resend.Emails.send(_build_email_params(
+            to=[user.email],
+            subject=f"You've been approved for {club.name}!",
+            html=f"""
 <h2>Welcome to {club.name}!</h2>
 <p>Hi {user.first_name}, your request to join <strong>{club.name}</strong> has been approved.</p>
 <p>You can now participate in discussions, RSVP to events, and suggest topics.</p>
@@ -89,7 +98,7 @@ def send_membership_approved_alert(membership_id: int) -> None:
 <hr>
 <p style="color:#888;font-size:12px">Spark Clubs</p>
 """,
-        })
+        ))
 
         logger.info(f"Approval alert sent to {user.email} for club '{club.name}'")
 
@@ -106,11 +115,10 @@ def send_member_removed_alert(club_name: str, user_email: str, user_first_name: 
         return
 
     try:
-        resend.Emails.send({
-            "from": f"Spark Clubs <{settings.DEFAULT_FROM_EMAIL}>",
-            "to": [user_email],
-            "subject": f"You have been removed from {club_name}",
-            "html": f"""
+        resend.Emails.send(_build_email_params(
+            to=[user_email],
+            subject=f"You have been removed from {club_name}",
+            html=f"""
 <h2>Membership Update</h2>
 <p>Hi {user_first_name}, your membership in <strong>{club_name}</strong> has been removed.</p>
 <p>If you believe this was a mistake, please contact the club administrator.</p>
@@ -118,7 +126,7 @@ def send_member_removed_alert(club_name: str, user_email: str, user_first_name: 
 <hr>
 <p style="color:#888;font-size:12px">Spark Clubs</p>
 """,
-        })
+        ))
 
         logger.info(f"Removal alert sent to {user_email} for club '{club_name}'")
 
@@ -135,11 +143,10 @@ def send_test_email(to_email: str, subject: str, body: str) -> None:
         raise ValueError("Resend API key is not configured")
 
     try:
-        resend.Emails.send({
-            "from": f"Spark Clubs <{settings.DEFAULT_FROM_EMAIL}>",
-            "to": [to_email],
-            "subject": subject,
-            "html": f"""
+        resend.Emails.send(_build_email_params(
+            to=[to_email],
+            subject=subject,
+            html=f"""
 <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
   <h2>Test Email from Spark Clubs</h2>
   <div style="background:#f5f5f5;padding:16px;border-radius:8px;margin:16px 0">
@@ -149,7 +156,7 @@ def send_test_email(to_email: str, subject: str, body: str) -> None:
   <p style="color:#888;font-size:12px">This is a test email sent by a Spark Clubs site administrator.</p>
 </div>
 """,
-        })
+        ))
 
         logger.info(f"Test email sent to {to_email}")
 
