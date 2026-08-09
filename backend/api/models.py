@@ -47,7 +47,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         max_length=5, validators=[RegexValidator(r"^\d{5}$", "Enter a valid 5-digit zip code.")]
     )
     bio = models.TextField(max_length=500, blank=True, null=True)
-    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default="awaiting_verification")
+    user_type = models.CharField(max_length=30, choices=USER_TYPE_CHOICES, default="awaiting_verification")
     google_id = models.CharField(max_length=255, unique=True, blank=True, null=True)
     club_creation_limit = models.IntegerField(default=5, help_text="Maximum number of clubs this user can create")
     email_notifications_enabled = models.BooleanField(

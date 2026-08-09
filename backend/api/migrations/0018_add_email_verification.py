@@ -32,7 +32,7 @@ class Migration(migrations.Migration):
                     ("super_admin", "Super Admin"),
                 ],
                 default="awaiting_verification",
-                max_length=20,
+                max_length=30,
             ),
         ),
     ]
