@@ -68,6 +68,26 @@ const ClubDetail: React.FC = () => {
   const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const [sortOrder, setSortOrder] = useState<'recent' | 'interested'>('recent');
+  const [revealedTopics, setRevealedTopics] = useState<Set<number>>(new Set());
+
+  const toggleRevealTopic = (topicId: number) => {
+    setRevealedTopics(prev => {
+      const next = new Set(prev);
+      if (next.has(topicId)) { next.delete(topicId); } else { next.add(topicId); }
+      return next;
+    });
+  };
+
+  const revealAllTopics = () => {
+    const allIds = topics
+      .filter((t: Topic) => showHidden || t.status !== 'hidden')
+      .map((t: Topic) => t.id);
+    setRevealedTopics(new Set(allIds));
+  };
+
+  const hideAllTopics = () => {
+    setRevealedTopics(new Set());
+  };
   const [eventFormData, setEventFormData] = useState({
     title: '', topic_ids: [] as number[], start_datetime: '', end_datetime: '',
     location: '', host: '', status: 'pending',
@@ -398,6 +418,12 @@ const ClubDetail: React.FC = () => {
                 <button className="btn btn-link btn-sm" onClick={() => setShowHidden(!showHidden)} style={{ padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>
                   {showHidden ? 'Hide hidden' : 'Show hidden'}
                 </button>
+                <button className="btn btn-link btn-sm" onClick={revealAllTopics} style={{ padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>
+                  Reveal all
+                </button>
+                <button className="btn btn-link btn-sm" onClick={hideAllTopics} style={{ padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>
+                  Hide all
+                </button>
                 <select className="form-control" style={{ width: 'auto', fontSize: '0.85em' }} value={sortOrder} onChange={(e) => setSortOrder(e.target.value as 'recent' | 'interested')}>
                   <option value="recent">Most recently added</option>
                   <option value="interested">Most interested</option>
@@ -446,53 +472,61 @@ const ClubDetail: React.FC = () => {
                   })
                   .map((topic: Topic) => (
                   <div key={topic.id} className="card mb-2" style={{ padding: '16px' }}>
-                    {/* Top section: two-column layout */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px', marginBottom: '12px' }}>
-                      {/* Left column: Title + Description */}
+                    {/* Part 1: Always visible — Title, status, interest, edit, reveal toggle */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <h4 style={{ margin: '0 0 8px 0', fontWeight: 'bold', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.title}</h4>
-                        {topic.description && (
-                          <p style={{ margin: 0, color: '#333', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.description}</p>
-                        )}
+                        <h4 style={{ margin: 0, fontWeight: 'bold', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.title}</h4>
                       </div>
-                      {/* Right column: Controls + Counts + Meta */}
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', flexShrink: 0 }}>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          {isClubAdmin ? (
-                            <select className="form-control" style={{ width: 'auto', fontSize: '0.8em', padding: '2px 4px' }} value={topic.status} onChange={(e) => topicStatusMutation.mutate({ topicId: topic.id, status: e.target.value })}>
-                              <option value="pending">Pending</option>
-                              <option value="active">Active</option>
-                              <option value="inactive">Inactive</option>
-                              <option value="hidden">Hidden</option>
-                            </select>
-                          ) : (
-                            <span className={`badge badge-${topic.status}`}>{topic.status}</span>
-                          )}
-                          {isTopicCreator(topic) && (
-                            <button className="btn btn-sm btn-secondary" onClick={() => {
-                              setEditingTopicId(topic.id);
-                              setTopicFormData({ title: topic.title, description: topic.description, tabs: topic.tabs || '' });
-                              setShowTopicForm(true);
-                            }}>Edit</button>
-                          )}
-                          <select className="form-control" style={{ width: 'auto' }} value={topic.user_interest || ''} onChange={(e) => { if (e.target.value) { interestMutation.mutate({ topicId: topic.id, interestType: e.target.value }); } else { removeInterestMutation.mutate(topic.id); } }} title="Set my interest">
-                            <option value="">My interest: none</option>
-                            <option value="interested">👍 Interested</option>
-                            <option value="able_to_lead">🎤 I can lead this discussion</option>
-                            <option value="not_interested">👎 Not interested</option>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        {isClubAdmin ? (
+                          <select className="form-control" style={{ width: 'auto', fontSize: '0.8em', padding: '2px 4px' }} value={topic.status} onChange={(e) => topicStatusMutation.mutate({ topicId: topic.id, status: e.target.value })}>
+                            <option value="pending">Pending</option>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="hidden">Hidden</option>
                           </select>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.85em', color: '#666', whiteSpace: 'nowrap' }}>
-                          <span>👍 {topic.interest_counts?.interested || 0}</span>
-                          <span>🎤 {topic.interest_counts?.able_to_lead || 0}</span>
-                          <span>👎 {topic.interest_counts?.not_interested || 0}</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.8em', color: '#666' }}>
-                          {topic.tabs && <span>🏷 {topic.tabs}</span>}
-                          <span>👤 {topic.created_by_name}</span>
-                        </div>
+                        ) : (
+                          <span className={`badge badge-${topic.status}`}>{topic.status}</span>
+                        )}
+                        <select className="form-control" style={{ width: 'auto' }} value={topic.user_interest || ''} onChange={(e) => { if (e.target.value) { interestMutation.mutate({ topicId: topic.id, interestType: e.target.value }); } else { removeInterestMutation.mutate(topic.id); } }} title="Set my interest">
+                          <option value="">My interest: none</option>
+                          <option value="interested">👍 Interested</option>
+                          <option value="able_to_lead">🎤 I can lead this discussion</option>
+                          <option value="not_interested">👎 Not interested</option>
+                        </select>
+                        {(isTopicCreator(topic) || isClubAdmin) && (
+                          <button className="btn btn-sm btn-secondary" onClick={() => {
+                            setEditingTopicId(topic.id);
+                            setTopicFormData({ title: topic.title, description: topic.description, tabs: topic.tabs || '' });
+                            setShowTopicForm(true);
+                          }}>Edit</button>
+                        )}
+                        <button
+                          className="btn btn-sm btn-link"
+                          onClick={() => toggleRevealTopic(topic.id)}
+                          style={{ padding: '2px 6px', fontSize: '1.2em', lineHeight: 1, textDecoration: 'none', cursor: 'pointer' }}
+                          title={revealedTopics.has(topic.id) ? 'Hide details' : 'Show details'}
+                        >
+                          {revealedTopics.has(topic.id) ? '▲' : '▼'}
+                        </button>
                       </div>
                     </div>
+
+                    {/* Part 2: Hidden until revealed — Description, interest counts, tags, creator */}
+                    {revealedTopics.has(topic.id) && (
+                      <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid #eee' }}>
+                        {topic.description && (
+                          <p style={{ margin: '0 0 8px 0', color: '#333', wordWrap: 'break-word', overflowWrap: 'break-word' }}>{topic.description}</p>
+                        )}
+                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', fontSize: '0.85em', color: '#666', flexWrap: 'wrap' }}>
+                          <span>👍 {topic.interest_counts?.interested || 0} interested</span>
+                          <span>🎤 {topic.interest_counts?.able_to_lead || 0} can lead</span>
+                          <span>👎 {topic.interest_counts?.not_interested || 0} not interested</span>
+                          {topic.tabs && <span>🏷 {topic.tabs}</span>}
+                          <span>👤 Created by {topic.created_by_name}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
