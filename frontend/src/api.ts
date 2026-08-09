@@ -168,6 +168,11 @@ export const usersAPI = {
     const response = await apiFetch(`/users/${userId}/increase_club_limit/`, { method: 'POST' });
     return handleResponse(response);
   },
+
+  deleteAccount: async (userId: number) => {
+    const response = await apiFetch(`/users/${userId}/delete_account/`, { method: 'DELETE' });
+    return handleResponse(response);
+  },
 };
 
 // Clubs API
