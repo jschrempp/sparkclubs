@@ -163,3 +163,51 @@ def send_test_email(to_email: str, subject: str, body: str) -> None:
     except Exception as e:
         logger.error(f"Failed to send test email to {to_email}: {e}")
         raise
+
+
+@shared_task(rate_limit="30/m", max_retries=3, default_retry_delay=60)
+def send_activation_email(user_id: int, activation_token: str) -> None:
+    """Send an account activation email with a verification link."""
+    if not settings.EMAIL_ENABLED or not settings.RESEND_API_KEY:
+        logger.info("Email disabled or no Resend API key — skipping activation email")
+        return
+
+    from .models import User
+
+    try:
+        user = User.objects.only("id", "first_name", "email", "email_notifications_enabled").get(id=user_id)
+
+        if not user.is_active:
+            logger.info(f"Skipping activation email for {user.email} — user is inactive")
+            return
+
+        activation_url = f"{settings.FRONTEND_URL}/verify-email?token={activation_token}"
+
+        resend.Emails.send(_build_email_params(
+            to=[user.email],
+            subject="Verify your email address — Spark Clubs",
+            html=f"""
+<h2>Welcome to Spark Clubs!</h2>
+<p>Hi {user.first_name},</p>
+<p>Thanks for creating an account. Please verify your email address by clicking the link below:</p>
+<p style="margin:24px 0">
+  <a href="{activation_url}"
+     style="background:#4F46E5;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block">
+    Verify Email Address
+  </a>
+</p>
+<p>Or copy and paste this link into your browser:</p>
+<p style="color:#4F46E5;word-break:break-all">{activation_url}</p>
+<p>This link will expire in 48 hours.</p>
+<hr>
+<p style="color:#888;font-size:12px">
+  If you didn't create an account on Spark Clubs, you can safely ignore this email.
+</p>
+""",
+        ))
+
+        logger.info(f"Activation email sent to {user.email}")
+
+    except Exception as e:
+        logger.error(f"Failed to send activation email to user {user_id}: {e}")
+        raise

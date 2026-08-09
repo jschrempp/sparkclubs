@@ -8,17 +8,18 @@ from .models import User, Club, ClubMembership, Topic, TopicInterest, Event, Eve
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ("email", "first_name", "last_name", "user_type", "created_at")
-    list_filter = ("user_type", "created_at")
+    list_display = ("email", "first_name", "last_name", "user_type", "is_active", "created_at")
+    list_filter = ("user_type", "is_active", "created_at")
     search_fields = ("email", "first_name", "last_name")
     ordering = ("-created_at",)
     fieldsets = (
         ("User Information", {"fields": ("email", "first_name", "last_name", "zip_code", "bio")}),
         ("Authentication", {"fields": ("password", "google_id")}),
+        ("Verification", {"fields": ("activation_token", "activation_token_created_at")}),
         ("Permissions", {"fields": ("user_type", "is_staff", "is_active", "is_superuser")}),
         ("Dates", {"fields": ("created_at", "updated_at", "last_login"), "classes": ("collapse",)}),
     )
-    readonly_fields = ("created_at", "updated_at", "last_login")
+    readonly_fields = ("created_at", "updated_at", "last_login", "activation_token", "activation_token_created_at")
 
 
 @admin.register(Club)

@@ -3,6 +3,7 @@ from typing import Any, Optional
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.core.validators import RegexValidator
+from django.utils import timezone
 import secrets
 
 
@@ -32,6 +33,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     """Custom user model with email as username."""
 
     USER_TYPE_CHOICES = [
+        ("awaiting_verification", "Awaiting Verification"),
         ("pending", "Pending"),
         ("member", "Member"),
         ("site_admin", "Site Admin"),
@@ -45,12 +47,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         max_length=5, validators=[RegexValidator(r"^\d{5}$", "Enter a valid 5-digit zip code.")]
     )
     bio = models.TextField(max_length=500, blank=True, null=True)
-    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default="pending")
+    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, default="awaiting_verification")
     google_id = models.CharField(max_length=255, unique=True, blank=True, null=True)
     club_creation_limit = models.IntegerField(default=5, help_text="Maximum number of clubs this user can create")
     email_notifications_enabled = models.BooleanField(
         default=True, help_text="Whether the user wants to receive email alerts"
     )
+    activation_token = models.CharField(max_length=64, unique=True, blank=True, null=True)
+    activation_token_created_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     last_login = models.DateTimeField(null=True, blank=True)
@@ -82,6 +86,23 @@ class User(AbstractBaseUser, PermissionsMixin):
         if self.is_site_admin():
             return True
         return ClubMembership.objects.filter(club=club, user=self, is_admin=True, status="active").exists()
+
+    def generate_activation_token(self) -> str:
+        """Generate a unique activation token and save it to the user."""
+        while True:
+            token = secrets.token_urlsafe(32)
+            if not User.objects.filter(activation_token=token).exists():
+                break
+        self.activation_token = token
+        self.activation_token_created_at = timezone.now()
+        self.save(update_fields=["activation_token", "activation_token_created_at"])
+        return token
+
+    def clear_activation_token(self) -> None:
+        """Clear the activation token after successful verification."""
+        self.activation_token = None
+        self.activation_token_created_at = None
+        self.save(update_fields=["activation_token", "activation_token_created_at"])
 
 
 class Club(models.Model):

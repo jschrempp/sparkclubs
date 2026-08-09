@@ -32,7 +32,7 @@ from .serializers import (
 )
 from .permissions import IsSuperAdmin, IsSiteAdmin, IsMemberOrAdmin, IsClubAdmin, IsClubMember
 from .authentication import generate_token_pair, set_refresh_cookie, clear_refresh_cookie, REFRESH_COOKIE_NAME
-from .tasks import send_join_request_alert, send_membership_approved_alert, send_member_removed_alert, send_test_email
+from .tasks import send_join_request_alert, send_membership_approved_alert, send_member_removed_alert, send_test_email, send_activation_email
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
@@ -112,6 +112,11 @@ class LoginView(APIView):
 
         user = User.objects.filter(email__iexact=email).first()
         if user and user.check_password(password):
+            if user.user_type == "awaiting_verification":
+                return Response(
+                    {"error": "Please verify your email address before logging in. Check your inbox for the activation link."},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             user.last_login = timezone.now()
             user.save()
 
@@ -124,7 +129,7 @@ class LoginView(APIView):
 
 
 class RegisterView(APIView):
-    """Register a new user."""
+    """Register a new user. Sends an activation email; account is 'awaiting_verification' until verified."""
 
     permission_classes = [AllowAny]
 
@@ -148,14 +153,80 @@ class RegisterView(APIView):
             if error:
                 return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
-        system_settings = SystemSettings.get_settings()
-        user_type = "member" if system_settings.auto_approve_users else "pending"
-        user = serializer.save(user_type=user_type)
+        # Always start as awaiting_verification — user must click the activation link
+        user = serializer.save(user_type="awaiting_verification")
 
+        # Generate activation token and send email
+        activation_token = user.generate_activation_token()
+        send_activation_email.delay(user.id, activation_token)
+
+        return Response(
+            {
+                "message": "Account created. Please check your email to verify your account.",
+                "user_id": user.id,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class VerifyEmailView(APIView):
+    """Verify a user's email address via activation token."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request: HttpRequest) -> Response:
+        token = request.data.get("token")
+        if not token:
+            return Response({"error": "Activation token is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(activation_token=token).first()
+        if not user:
+            return Response({"error": "Invalid or expired activation token"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check token expiry (48 hours)
+        from datetime import timedelta
+
+        if user.activation_token_created_at:
+            if timezone.now() - user.activation_token_created_at > timedelta(hours=48):
+                return Response({"error": "Activation token has expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Promote user to member (or pending if auto-approve is off)
+        system_settings = SystemSettings.get_settings()
+        user.user_type = "member" if system_settings.auto_approve_users else "pending"
+        user.clear_activation_token()
+
+        # Issue tokens so the user is logged in immediately
         access_token, refresh_token = generate_token_pair(user)
-        response = Response({"token": access_token, "user": UserSerializer(user).data}, status=status.HTTP_201_CREATED)
+        response = Response(
+            {
+                "message": "Email verified successfully.",
+                "token": access_token,
+                "user": UserSerializer(user).data,
+            }
+        )
         set_refresh_cookie(response, refresh_token)
         return response
+
+
+class ResendActivationView(APIView):
+    """Resend the activation email to a user who hasn't verified yet."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request: HttpRequest) -> Response:
+        email = request.data.get("email")
+        if not email:
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(email__iexact=email, user_type="awaiting_verification").first()
+        if not user:
+            # Don't reveal whether the email exists — always return success
+            return Response({"message": "If an unverified account with that email exists, a new activation link has been sent."})
+
+        activation_token = user.generate_activation_token()
+        send_activation_email.delay(user.id, activation_token)
+
+        return Response({"message": "If an unverified account with that email exists, a new activation link has been sent."})
 
 
 class TokenRefreshView(APIView):
@@ -173,6 +244,8 @@ class TokenRefreshView(APIView):
             user = User.objects.get(id=old_refresh["user_id"])
             if not user.is_active:
                 return Response({"error": "User is inactive"}, status=status.HTTP_401_UNAUTHORIZED)
+            if user.user_type == "awaiting_verification":
+                return Response({"error": "Please verify your email address"}, status=status.HTTP_401_UNAUTHORIZED)
 
             access_token, new_refresh_token = generate_token_pair(user)
             try:
@@ -354,6 +427,56 @@ class UserViewSet(viewsets.ModelViewSet):
                 "club_creation_limit": user.club_creation_limit,
             }
         )
+
+    @action(detail=False, methods=["get"], permission_classes=[IsSiteAdmin])
+    def awaiting_verification(self, request: HttpRequest) -> Response:
+        """List all users with 'awaiting_verification' status (site admin only)."""
+        users = User.objects.filter(user_type="awaiting_verification").order_by("-created_at")
+        page = self.paginate_queryset(users)
+        if page is not None:
+            serializer = AdminUserSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = AdminUserSerializer(users, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsSiteAdmin])
+    def approve_account(self, request: HttpRequest, pk: Any = None) -> Response:
+        """Approve an account without waiting for email verification (site admin only)."""
+        user = self.get_object()
+
+        if user.user_type not in ("awaiting_verification", "pending"):
+            return Response(
+                {"error": "This account is not in a pending or awaiting-verification state"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user.user_type = "member"
+        user.clear_activation_token()
+        user.save()
+
+        return Response(
+            {"message": f"Account for {user.email} has been approved.", "user": UserSerializer(user).data}
+        )
+
+    @action(detail=True, methods=["delete"], permission_classes=[IsSiteAdmin])
+    def delete_account(self, request: HttpRequest, pk: Any = None) -> Response:
+        """Delete a pending/unverified account (site admin only)."""
+        user = self.get_object()
+
+        if user.user_type not in ("awaiting_verification", "pending"):
+            return Response(
+                {"error": "Only pending or awaiting-verification accounts can be deleted this way"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Site admins cannot delete super admins
+        if user.user_type == "super_admin" and not request.user.is_super_admin():
+            return Response({"error": "Cannot delete super admin"}, status=status.HTTP_403_FORBIDDEN)
+
+        email = user.email
+        user.delete()
+
+        return Response({"message": f"Account for {email} has been deleted."})
 
 
 # Club Management Views

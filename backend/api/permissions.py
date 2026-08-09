@@ -24,10 +24,14 @@ class IsSiteAdmin(permissions.BasePermission):
 
 
 class IsMemberOrAdmin(permissions.BasePermission):
-    """Members and admins can access (excludes pending users)."""
+    """Members and admins can access (excludes pending and awaiting_verification users)."""
 
     def has_permission(self, request: HttpRequest, view: APIView) -> bool:
-        return bool(request.user and request.user.is_authenticated and request.user.user_type != "pending")
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.user_type not in ("pending", "awaiting_verification")
+        )
 
 
 class IsClubAdmin(permissions.BasePermission):

@@ -55,13 +55,15 @@ class AdminUserSerializer(serializers.ModelSerializer):
             "user_type",
             "club_creation_limit",
             "email_notifications_enabled",
+            "activation_token",
+            "activation_token_created_at",
             "created_at",
             "updated_at",
             "last_login",
             "club_memberships",
             "clubs_created_count",
         ]
-        read_only_fields = ["id", "created_at", "updated_at", "last_login"]
+        read_only_fields = ["id", "created_at", "updated_at", "last_login", "activation_token", "activation_token_created_at"]
 
     def get_club_memberships(self, obj: User) -> list[dict[str, Any]]:
         """Get all club memberships for the user with club details."""
