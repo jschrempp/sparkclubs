@@ -43,7 +43,7 @@ def send_join_request_alert(club_id: int, requesting_user_id: int, admin_ids: li
             logger.info(f"No active admins to notify for club '{club.name}'")
             return
 
-        admin_emails = [{"to": a.email} for a in admins]
+        admin_emails = [a.email for a in admins]
         requester_name = f"{requesting_user.first_name} {requesting_user.last_name}"
 
         resend.Emails.send(_build_email_params(
@@ -238,7 +238,7 @@ def send_club_created_alert(club_id: int, creator_id: int) -> None:
             logger.info(f"No active site admins to notify for new club '{club.name}'")
             return
 
-        admin_emails = [{"to": a.email} for a in admins]
+        admin_emails = [a.email for a in admins]
         creator_name = f"{creator.first_name} {creator.last_name}"
 
         resend.Emails.send(_build_email_params(
@@ -292,7 +292,7 @@ def send_topic_pending_alert(topic_id: int) -> None:
             logger.info(f"No active admins to notify for pending topic in club '{club.name}'")
             return
 
-        admin_emails = [{"to": a.email} for a in admins]
+        admin_emails = [a.email for a in admins]
         author_name = f"{topic.created_by.first_name} {topic.created_by.last_name}" if topic.created_by else "Unknown"
 
         resend.Emails.send(_build_email_params(
