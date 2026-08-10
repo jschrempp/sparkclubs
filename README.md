@@ -188,6 +188,36 @@ Topics support four interest levels:
 - New accounts awaiting approval
 - Limited access until promoted by admin
 
+## 📧 Email Notifications
+
+The system sends emails via [Resend](https://resend.com) for key account and membership events. All emails are dispatched asynchronously through Celery tasks. **Email notifications are enabled by default** for all users. Every notification email includes a link to the Profile page where users can manage their preferences.
+
+### When Emails Are Sent
+
+| Trigger | Recipient | Email |
+|---|---|---|
+| **Account registration** | New user | **Activation email** — contains a verification link (expires in 48 hours). The account remains `awaiting_verification` until the link is clicked. |
+| **Resend activation** (user requests a new link) | Unverified user | **Activation email** — same as above, with a fresh 48-hour token. |
+| **Join request** (manual approval clubs only) | All active club admins with notifications enabled | **Join request alert** — notifies admins that someone wants to join their club, with a link to review the request. |
+| **Membership approved** | Approved member | **Approval confirmation** — welcomes the member to the club with a link to start participating. |
+| **Member removed** | Removed member | **Removal notice** — informs the member they were removed and suggests browsing other clubs. |
+| **Test email** (site admin action) | Any email address | **Test email** — used by site admins to verify email configuration is working. |
+| **New club created** | All site admins with notifications enabled | **Club created alert** — notifies site administrators that a new club has been created, with the club name, zip code, and creator info. |
+| **Topic moves to pending** (manual approval clubs only) | All active club admins with notifications enabled | **Topic pending alert** — notifies admins that a topic is awaiting their approval. Sent when a topic is created in a club with `auto_approve_topics` disabled, or when an existing topic's status is changed to pending. |
+
+### Opting Out
+- Visit the **Profile** page (`/profile`) and uncheck "Receive email notifications." This updates `email_notifications_enabled` to `false` via `PATCH /api/auth/me/`.
+- Every notification email also includes a **"Manage notification preferences"** link in the footer that goes directly to the Profile page.
+- When disabled, the user will not receive join request alerts, topic pending alerts (as an admin), club created alerts (as a site admin), approval confirmations, or removal notices.
+- **Account activation emails are always sent** regardless of this setting, since they are required to complete registration.
+
+### Configuration
+- `RESEND_API_KEY` — API key for the Resend email service (required).
+- `EMAIL_ENABLED` — Master switch; set to `False` to suppress all emails (useful in development).
+- `DEFAULT_FROM_EMAIL` — Sender address (e.g., `notifications@sparkclubs.com`).
+- `DEFAULT_REPLY_TO_EMAIL` — Optional reply-to address.
+- `FRONTEND_URL` — Base URL of the frontend, used to build links in emails.
+
 ## 🎨 Frontend Pages
 
 - **Landing**: Welcome page with registration/login
@@ -195,6 +225,7 @@ Topics support four interest levels:
 - **Clubs**: Browse and search for clubs
 - **Club Detail**: View topics, events, and members for a specific club
 - **Admin Panel**: Site-wide administration (admins only)
+- **Profile**: View account info, change password, and manage notification preferences
 - **About**: Information about the platform
 
 ## 📝 API Endpoints
@@ -298,7 +329,6 @@ For questions or issues:
 ## 🗺️ Roadmap
 
 ### Planned Features
-- Email notifications for events and approvals
 - Discussion forums per topic
 - Calendar integration (iCal, Google Calendar)
 - Advanced search and filtering
@@ -313,6 +343,6 @@ Built with Django REST Framework and React for modern, scalable web applications
 
 ---
 
-**Version**: 1.1  
-**Last Updated**: July 6, 2026  
+**Version**: 1.2  
+**Last Updated**: August 9, 2026  
 **Platform**: Spark Clubs Discussion Management

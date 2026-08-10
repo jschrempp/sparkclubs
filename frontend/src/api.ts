@@ -138,6 +138,11 @@ export const authAPI = {
     return handleResponse(response);
   },
 
+  updateProfile: async (data: Record<string, unknown>) => {
+    const response = await apiFetch('/auth/me/', { method: 'PATCH', body: data });
+    return handleResponse(response);
+  },
+
   myMemberships: async () => {
     const response = await apiFetch('/auth/my-memberships/');
     return handleResponse(response);

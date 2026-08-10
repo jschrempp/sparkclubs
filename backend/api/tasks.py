@@ -55,7 +55,8 @@ def send_join_request_alert(club_id: int, requesting_user_id: int, admin_ids: li
 <p>Please review this request in your club dashboard.</p>
 <p><a href="{settings.FRONTEND_URL}/clubs/{club.id}/members">Review membership requests →</a></p>
 <hr>
-<p style="color:#888;font-size:12px">Spark Clubs — Sent because you are an admin of {club.name}.</p>
+<p style="color:#888;font-size:12px">Spark Clubs — Sent because you are an admin of {club.name}.<br>
+<a href="{settings.FRONTEND_URL}/profile">Manage notification preferences →</a></p>
 """,
         ))
 
@@ -96,7 +97,8 @@ def send_membership_approved_alert(membership_id: int) -> None:
 <p>You can now participate in discussions, RSVP to events, and suggest topics.</p>
 <p><a href="{settings.FRONTEND_URL}/clubs/{club.id}">Go to {club.name} →</a></p>
 <hr>
-<p style="color:#888;font-size:12px">Spark Clubs</p>
+<p style="color:#888;font-size:12px">Spark Clubs<br>
+<a href="{settings.FRONTEND_URL}/profile">Manage notification preferences →</a></p>
 """,
         ))
 
@@ -124,7 +126,8 @@ def send_member_removed_alert(club_name: str, user_email: str, user_first_name: 
 <p>If you believe this was a mistake, please contact the club administrator.</p>
 <p><a href="{settings.FRONTEND_URL}/clubs">Browse other clubs →</a></p>
 <hr>
-<p style="color:#888;font-size:12px">Spark Clubs</p>
+<p style="color:#888;font-size:12px">Spark Clubs<br>
+<a href="{settings.FRONTEND_URL}/profile">Manage notification preferences →</a></p>
 """,
         ))
 
@@ -210,4 +213,107 @@ def send_activation_email(user_id: int, activation_token: str) -> None:
 
     except Exception as e:
         logger.error(f"Failed to send activation email to user {user_id}: {e}")
+        raise
+
+
+@shared_task(rate_limit="30/m", max_retries=3, default_retry_delay=60)
+def send_club_created_alert(club_id: int, creator_id: int) -> None:
+    """Notify all site admins that a new club has been created."""
+    if not settings.EMAIL_ENABLED or not settings.RESEND_API_KEY:
+        logger.info("Email disabled or no Resend API key — skipping club created alert")
+        return
+
+    from .models import Club, User
+
+    try:
+        club = Club.objects.only("id", "name", "zip_code").get(id=club_id)
+        creator = User.objects.only("id", "first_name", "last_name", "email").get(id=creator_id)
+        admins = list(User.objects.filter(
+            user_type__in=["site_admin", "super_admin"],
+            is_active=True,
+            email_notifications_enabled=True,
+        ))
+
+        if not admins:
+            logger.info(f"No active site admins to notify for new club '{club.name}'")
+            return
+
+        admin_emails = [{"to": a.email} for a in admins]
+        creator_name = f"{creator.first_name} {creator.last_name}"
+
+        resend.Emails.send(_build_email_params(
+            to=admin_emails,
+            subject=f"New club created: {club.name}",
+            html=f"""
+<h2>New Club Created</h2>
+<p><strong>{creator_name}</strong> ({creator.email}) created a new club:</p>
+<ul>
+  <li><strong>Name:</strong> {club.name}</li>
+  <li><strong>Zip Code:</strong> {club.zip_code}</li>
+</ul>
+<p><a href="{settings.FRONTEND_URL}/clubs/{club.id}">View {club.name} →</a></p>
+<hr>
+<p style="color:#888;font-size:12px">Spark Clubs — Sent because you are a site administrator.<br>
+<a href="{settings.FRONTEND_URL}/profile">Manage notification preferences →</a></p>
+""",
+        ))
+
+        logger.info(f"Club created alert sent to {len(admins)} site admin(s) for club '{club.name}'")
+
+    except Exception as e:
+        logger.error(f"Failed to send club created alert for club {club_id}: {e}")
+        raise
+
+
+@shared_task(rate_limit="30/m", max_retries=3, default_retry_delay=60)
+def send_topic_pending_alert(topic_id: int) -> None:
+    """Notify all club admins that a topic is awaiting approval (pending status)."""
+    if not settings.EMAIL_ENABLED or not settings.RESEND_API_KEY:
+        logger.info("Email disabled or no Resend API key — skipping topic pending alert")
+        return
+
+    from .models import Topic, User
+
+    try:
+        topic = Topic.objects.select_related("club", "created_by").only(
+            "id", "title", "club__id", "club__name", "created_by__first_name", "created_by__last_name", "created_by__email",
+        ).get(id=topic_id)
+
+        club = topic.club
+        admins = list(User.objects.filter(
+            memberships__club=club,
+            memberships__is_admin=True,
+            memberships__status="active",
+            is_active=True,
+            email_notifications_enabled=True,
+        ).distinct())
+
+        if not admins:
+            logger.info(f"No active admins to notify for pending topic in club '{club.name}'")
+            return
+
+        admin_emails = [{"to": a.email} for a in admins]
+        author_name = f"{topic.created_by.first_name} {topic.created_by.last_name}" if topic.created_by else "Unknown"
+
+        resend.Emails.send(_build_email_params(
+            to=admin_emails,
+            subject=f"Topic awaiting approval in {club.name}: {topic.title}",
+            html=f"""
+<h2>Topic Needs Review</h2>
+<p>A new topic in <strong>{club.name}</strong> is awaiting approval:</p>
+<ul>
+  <li><strong>Title:</strong> {topic.title}</li>
+  <li><strong>Proposed by:</strong> {author_name}</li>
+</ul>
+<p><a href="{settings.FRONTEND_URL}/clubs/{club.id}">Review topics in {club.name} →</a></p>
+<hr>
+<p style="color:#888;font-size:12px">Spark Clubs — Sent because you are an admin of {club.name}.<br>
+<a href="{settings.FRONTEND_URL}/profile">Manage notification preferences →</a></p>
+""",
+        ))
+
+        logger.info(f"Topic pending alert sent to {len(admins)} admin(s) for topic '{topic.title}' in club '{club.name}'")
+
+    except Exception as e:
+        logger.error(f"Failed to send topic pending alert for topic {topic_id}: {e}")
         raise

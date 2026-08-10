@@ -10,6 +10,7 @@ interface User {
   zip_code: string;
   bio: string | null;
   user_type: string;
+  email_notifications_enabled: boolean;
   created_at: string;
   updated_at: string;
   last_login: string | null;
@@ -21,6 +22,7 @@ interface AuthContextType {
   login: (token: string, userData: User) => void;
   logout: () => void;
   updateUser: (userData: User) => void;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   isSuperAdmin: boolean;
   isSiteAdmin: boolean;
@@ -95,11 +97,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(userData);
   };
 
+  const refreshUser = async () => {
+    try {
+      const userData = await authAPI.me();
+      setUser(userData);
+    } catch {
+      // Silently fail — user data just won't refresh
+    }
+  };
+
   const value: AuthContextType = {
     user,
     login,
     logout,
     updateUser,
+    refreshUser,
     isAuthenticated: !!user,
     isSuperAdmin: user?.user_type === 'super_admin',
     isSiteAdmin: user?.user_type === 'site_admin' || user?.user_type === 'super_admin',

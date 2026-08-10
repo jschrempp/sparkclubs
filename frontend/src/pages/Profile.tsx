@@ -3,12 +3,16 @@ import { useAuth } from '../AuthContext';
 import { authAPI } from '../api';
 
 const Profile: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [form, setForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [notificationsEnabled, setNotificationsEnabled] = useState(
+    user?.email_notifications_enabled ?? true
+  );
+  const [togglingNotifications, setTogglingNotifications] = useState(false);
 
   const toggleShow = (field: string) =>
     setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
@@ -64,6 +68,20 @@ const Profile: React.FC = () => {
     }
   };
 
+  const handleToggleNotifications = async () => {
+    const newValue = !notificationsEnabled;
+    setTogglingNotifications(true);
+    try {
+      await authAPI.updateProfile({ email_notifications_enabled: newValue });
+      setNotificationsEnabled(newValue);
+      refreshUser();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update notification preference');
+    } finally {
+      setTogglingNotifications(false);
+    }
+  };
+
   return (
     <div className="page-container">
       <h2>My Profile</h2>
@@ -72,6 +90,21 @@ const Profile: React.FC = () => {
         <p><strong>Name:</strong> {user?.first_name} {user?.last_name}</p>
         <p><strong>Email:</strong> {user?.email}</p>
         <p><strong>Role:</strong> {user?.user_type.replace('_', ' ')}</p>
+      </div>
+
+      <div className="card" style={{ maxWidth: 480 }}>
+        <h3 style={{ marginTop: 0 }}>Notification Preferences</h3>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={notificationsEnabled}
+            onChange={handleToggleNotifications}
+            disabled={togglingNotifications}
+            style={{ width: '20px', height: '20px', cursor: 'pointer' }}
+          />
+          <span>Receive email notifications (join requests, approvals, topic alerts, etc.)</span>
+        </label>
+        {togglingNotifications && <p style={{ color: '#666', marginTop: '8px' }}>Saving…</p>}
       </div>
 
       <div className="card" style={{ maxWidth: 480 }}>

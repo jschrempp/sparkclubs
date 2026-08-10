@@ -32,7 +32,7 @@ from .serializers import (
 )
 from .permissions import IsSuperAdmin, IsSiteAdmin, IsMemberOrAdmin, IsClubAdmin, IsClubMember
 from .authentication import generate_token_pair, set_refresh_cookie, clear_refresh_cookie, REFRESH_COOKIE_NAME
-from .tasks import send_join_request_alert, send_membership_approved_alert, send_member_removed_alert, send_test_email, send_activation_email
+from .tasks import send_join_request_alert, send_membership_approved_alert, send_member_removed_alert, send_test_email, send_activation_email, send_club_created_alert, send_topic_pending_alert
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
@@ -551,6 +551,9 @@ class ClubViewSet(viewsets.ModelViewSet):
         # Automatically add creator as admin member
         ClubMembership.objects.create(club=club, user=user, status="active", is_admin=True)
 
+        # Notify site admins that a new club was created
+        send_club_created_alert.delay(club.id, user.id)
+
     def perform_update(self, serializer: ClubSerializer) -> None:
         """Validate club name uniqueness when updating."""
         club_name = serializer.validated_data.get("name")
@@ -772,7 +775,21 @@ class TopicViewSet(viewsets.ModelViewSet):
             serializer.validated_data["status"] = "active"
 
         # Save the club topic
-        serializer.save(created_by=self.request.user)
+        topic = serializer.save(created_by=self.request.user)
+
+        # If the topic is pending (manual approval needed), notify club admins
+        if topic.status == "pending":
+            send_topic_pending_alert.delay(topic.id)
+
+    def perform_update(self, serializer: TopicSerializer) -> None:
+        """Notify club admins when a topic is moved to pending status."""
+        topic = self.get_object()
+        old_status = topic.status
+        updated_topic = serializer.save()
+
+        # If status changed to pending, notify club admins
+        if old_status != "pending" and updated_topic.status == "pending":
+            send_topic_pending_alert.delay(updated_topic.id)
 
     @action(detail=True, methods=["post"])
     def set_interest(self, request: HttpRequest, pk: Any = None) -> Response:
