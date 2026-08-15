@@ -180,7 +180,7 @@ class ClubMembershipSerializer(serializers.ModelSerializer):
             "joined_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "joined_at", "updated_at"]
+        read_only_fields = ["id", "club", "user", "joined_at", "updated_at"]
 
     def get_user_name(self, obj: ClubMembership) -> str:
         return f"{obj.user.first_name} {obj.user.last_name}"

@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
@@ -569,8 +569,14 @@ class ClubViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def members(self, request: HttpRequest, pk: Any = None) -> Response:
-        """Get club members."""
+        """Get club members (active members and site admins only)."""
         club = self.get_object()
+
+        # Only active members (or site admins) may view the roster.
+        if not request.user.is_site_admin() and not ClubMembership.objects.filter(
+            club=club, user=request.user, status="active"
+        ).exists():
+            raise PermissionDenied("Only active members can view this club's members.")
 
         # Check permissions
         if not request.user.is_club_admin(club):
@@ -655,11 +661,33 @@ class ClubViewSet(viewsets.ModelViewSet):
 
 
 class ClubMembershipViewSet(viewsets.ModelViewSet):
-    """ViewSet for ClubMembership model."""
+    """ViewSet for ClubMembership model.
+
+    Memberships are created through the club ``join``/``approve`` flows, so the raw
+    ``create`` action is restricted. List/detail/update access is scoped to clubs the
+    user administers (site admins can see everything).
+    """
 
     queryset = ClubMembership.objects.all()
     serializer_class = ClubMembershipSerializer
     permission_classes = [IsClubAdmin]
+
+    def get_queryset(self) -> Any:
+        """Restrict to memberships of clubs the user administers."""
+        user = self.request.user
+        if user.is_site_admin():
+            return ClubMembership.objects.all()
+        admin_clubs = ClubMembership.objects.filter(
+            user=user, is_admin=True, status="active"
+        ).values_list("club_id", flat=True)
+        return ClubMembership.objects.filter(club_id__in=admin_clubs)
+
+    def get_permissions(self) -> list[Any]:
+        # Creating a membership directly would let a user self-assign admin status in
+        # any club. Memberships must only be created via the join/approve flows.
+        if self.action == "create":
+            return [IsSuperAdmin()]
+        return super().get_permissions()
 
     @action(detail=True, methods=["post"])
     def approve(self, request: HttpRequest, pk: Any = None) -> Response:
@@ -763,9 +791,12 @@ class TopicViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer: TopicSerializer) -> None:
         """Set created_by when creating a topic."""
-        # Check if title already exists in club
         club = serializer.validated_data["club"]
         title = serializer.validated_data["title"]
+
+        # Only active members of the club may create topics in it.
+        if not ClubMembership.objects.filter(club=club, user=self.request.user, status="active").exists():
+            raise PermissionDenied("Only active members can create topics in this club.")
 
         if Topic.objects.filter(club=club, title__iexact=title).exists():
             raise ValidationError({"title": "A topic with this title already exists in this club"})
@@ -784,6 +815,9 @@ class TopicViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer: TopicSerializer) -> None:
         """Notify club admins when a topic is moved to pending status."""
         topic = self.get_object()
+        new_club = serializer.validated_data.get("club")
+        if new_club and new_club != topic.club and not self.request.user.is_club_admin(new_club):
+            raise PermissionDenied("Only club admins can move a topic to another club.")
         old_status = topic.status
         updated_topic = serializer.save()
 
@@ -856,7 +890,7 @@ class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
 
     def get_permissions(self) -> list[Any]:
-        if self.action in ["create", "update", "partial_update"]:
+        if self.action in ["create", "update", "partial_update", "destroy"]:
             return [IsClubAdmin()]
         return [IsClubMember()]
 
@@ -885,7 +919,17 @@ class EventViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer: EventSerializer) -> None:
         """Set created_by when creating an event."""
+        club = serializer.validated_data.get("club")
+        if club and not self.request.user.is_club_admin(club):
+            raise PermissionDenied("Only club admins can create events in this club.")
         serializer.save(created_by=self.request.user)
+
+    def perform_update(self, serializer: EventSerializer) -> None:
+        """Prevent moving an event to a club the user does not administer."""
+        new_club = serializer.validated_data.get("club")
+        if new_club and not self.request.user.is_club_admin(new_club):
+            raise PermissionDenied("Only club admins can move an event to this club.")
+        serializer.save()
 
     @action(detail=True, methods=["post"])
     def rsvp(self, request: HttpRequest, pk: Any = None) -> Response:
