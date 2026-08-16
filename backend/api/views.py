@@ -772,12 +772,12 @@ class TopicViewSet(viewsets.ModelViewSet):
     def get_queryset(self) -> Any:
         """Filter topics based on permissions and club."""
         user = self.request.user
-        club_id = self.request.query_params.get("club")
+        club_public_id = self.request.query_params.get("club")
 
         queryset = Topic.objects.select_related("created_by", "club").prefetch_related("interests")
 
-        if club_id:
-            queryset = queryset.filter(club_id=club_id)
+        if club_public_id:
+            queryset = queryset.filter(club__public_id=club_public_id)
 
         # Non-admins can only see active/inactive topics
         if not user.is_site_admin():
@@ -900,15 +900,15 @@ class EventViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self) -> Any:
         """Filter events based on club and optional status."""
-        club_id = self.request.query_params.get("club")
+        club_public_id = self.request.query_params.get("club")
         status_filter = self.request.query_params.get("status")
 
         queryset = Event.objects.select_related("club", "host").prefetch_related(
             "event_topics__topic", "attendances", "date_options__votes"
         )
 
-        if club_id:
-            queryset = queryset.filter(club_id=club_id)
+        if club_public_id:
+            queryset = queryset.filter(club__public_id=club_public_id)
 
         if status_filter:
             queryset = queryset.filter(status=status_filter)
