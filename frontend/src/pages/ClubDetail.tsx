@@ -5,7 +5,7 @@ import { clubsAPI, topicsAPI, eventsAPI, membershipsAPI } from '../api';
 import { useAuth } from '../AuthContext';
 
 interface Topic {
-  id: number;
+  id: string;
   title: string;
   description: string;
   tabs: string;
@@ -18,7 +18,7 @@ interface Topic {
 }
 
 interface Event {
-  id: number;
+  id: string;
   title: string;
   start_datetime: string | null;
   end_datetime: string | null;
@@ -26,13 +26,13 @@ interface Event {
   host: number;
   host_name: string;
   status: string;
-  topics: { id: number; title: string }[];
+  topics: { id: string; title: string }[];
   attendance_count: number;
-  date_options: { id: number; start_datetime: string; end_datetime: string; vote_count: number; user_voted: boolean }[];
+  date_options: { id: string; start_datetime: string; end_datetime: string; vote_count: number; user_voted: boolean }[];
 }
 
 interface Member {
-  id: number;
+  id: string;
   user: number;
   user_name: string;
   status: string;
@@ -41,7 +41,7 @@ interface Member {
 }
 
 interface Club {
-  id: number;
+  id: string;
   name: string;
   description: string;
   zip_code: string;
@@ -61,16 +61,16 @@ const ClubDetail: React.FC = () => {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [showTopicForm, setShowTopicForm] = useState(false);
   const [topicFormData, setTopicFormData] = useState({ title: '', description: '', tabs: '' });
-  const [editingTopicId, setEditingTopicId] = useState<number | null>(null);
+  const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
   const [showEditClubForm, setShowEditClubForm] = useState(false);
   const [clubFormData, setClubFormData] = useState({ name: '', description: '', zip_code: '', is_public: true, auto_approve_topics: false });
   const [showEventForm, setShowEventForm] = useState(false);
-  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const [sortOrder, setSortOrder] = useState<'recent' | 'interested'>('recent');
-  const [revealedTopics, setRevealedTopics] = useState<Set<number>>(new Set());
+  const [revealedTopics, setRevealedTopics] = useState<Set<string>>(new Set());
 
-  const toggleRevealTopic = (topicId: number) => {
+  const toggleRevealTopic = (topicId: string) => {
     setRevealedTopics(prev => {
       const next = new Set(prev);
       if (next.has(topicId)) { next.delete(topicId); } else { next.add(topicId); }
@@ -89,7 +89,7 @@ const ClubDetail: React.FC = () => {
     setRevealedTopics(new Set());
   };
   const [eventFormData, setEventFormData] = useState({
-    title: '', topic_ids: [] as number[], start_datetime: '', end_datetime: '',
+    title: '', topic_ids: [] as string[], start_datetime: '', end_datetime: '',
     location: '', host: '', status: 'pending',
   });
   const [useDateVoting, setUseDateVoting] = useState(false);
@@ -145,38 +145,38 @@ const ClubDetail: React.FC = () => {
 
   // Mutations
   const rsvpMutation = useMutation({
-    mutationFn: (eventId: number) => eventsAPI.rsvp(eventId, 'attending'),
+    mutationFn: (eventId: string) => eventsAPI.rsvp(eventId, 'attending'),
     onSuccess: () => { alert('RSVP successful!'); invalidateAll(); },
     onError: (err: Error) => alert(err.message),
   });
 
   const interestMutation = useMutation({
-    mutationFn: ({ topicId, interestType }: { topicId: number; interestType: string }) =>
+    mutationFn: ({ topicId, interestType }: { topicId: string; interestType: string }) =>
       topicsAPI.expressInterest(topicId, interestType),
     onSuccess: () => invalidateAll(),
     onError: (err: Error) => alert(err.message),
   });
 
   const removeInterestMutation = useMutation({
-    mutationFn: (topicId: number) => topicsAPI.removeInterest(topicId),
+    mutationFn: (topicId: string) => topicsAPI.removeInterest(topicId),
     onSuccess: () => invalidateAll(),
     onError: (err: Error) => alert(err.message),
   });
 
   const approveMemberMutation = useMutation({
-    mutationFn: (membershipId: number) => membershipsAPI.update(membershipId, { status: 'active' }),
+    mutationFn: (membershipId: string) => membershipsAPI.update(membershipId, { status: 'active' }),
     onSuccess: () => { alert('Member approved!'); invalidateAll(); },
     onError: (err: Error) => alert(err.message),
   });
 
   const removeMemberMutation = useMutation({
-    mutationFn: (membershipId: number) => membershipsAPI.update(membershipId, { status: 'removed' }),
+    mutationFn: (membershipId: string) => membershipsAPI.update(membershipId, { status: 'removed' }),
     onSuccess: () => { alert('Member removed'); invalidateAll(); },
     onError: (err: Error) => alert(err.message),
   });
 
   const toggleAdminMutation = useMutation({
-    mutationFn: ({ membershipId, isAdmin }: { membershipId: number; isAdmin: boolean }) =>
+    mutationFn: ({ membershipId, isAdmin }: { membershipId: string; isAdmin: boolean }) =>
       membershipsAPI.update(membershipId, { is_admin: isAdmin }),
     onSuccess: (_data, vars) => {
       alert(`Admin status ${vars.isAdmin ? 'granted' : 'removed'}`);
@@ -186,7 +186,7 @@ const ClubDetail: React.FC = () => {
   });
 
   const topicMutation = useMutation({
-    mutationFn: ({ topicId, data }: { topicId?: number; data: Record<string, unknown> }) =>
+    mutationFn: ({ topicId, data }: { topicId?: string; data: Record<string, unknown> }) =>
       topicId ? topicsAPI.update(topicId, data) : topicsAPI.create(data),
     onSuccess: () => {
       alert(editingTopicId ? 'Topic updated!' : 'Topic added! Pending admin approval.');
@@ -205,14 +205,14 @@ const ClubDetail: React.FC = () => {
   });
 
   const topicStatusMutation = useMutation({
-    mutationFn: ({ topicId, status }: { topicId: number; status: string }) =>
+    mutationFn: ({ topicId, status }: { topicId: string; status: string }) =>
       topicsAPI.update(topicId, { status }),
     onSuccess: () => { alert('Topic status updated!'); invalidateAll(); },
     onError: (err: Error) => alert(err.message),
   });
 
   const eventMutation = useMutation({
-    mutationFn: ({ eventId, data }: { eventId?: number; data: Record<string, unknown> }) =>
+    mutationFn: ({ eventId, data }: { eventId?: string; data: Record<string, unknown> }) =>
       eventId ? eventsAPI.update(eventId, data) : eventsAPI.create(data),
     onSuccess: () => {
       alert(editingEventId ? 'Event updated!' : 'Event created!');
@@ -227,14 +227,14 @@ const ClubDetail: React.FC = () => {
   });
 
   const voteDateMutation = useMutation({
-    mutationFn: ({ eventId, dateOptionId }: { eventId: number; dateOptionId: number }) =>
+    mutationFn: ({ eventId, dateOptionId }: { eventId: string; dateOptionId: string }) =>
       eventsAPI.voteDate(eventId, dateOptionId),
     onSuccess: () => invalidateAll(),
     onError: (err: Error) => alert(err.message),
   });
 
   const selectDateMutation = useMutation({
-    mutationFn: ({ eventId, dateOptionId }: { eventId: number; dateOptionId: number }) =>
+    mutationFn: ({ eventId, dateOptionId }: { eventId: string; dateOptionId: string }) =>
       eventsAPI.selectDate(eventId, dateOptionId),
     onSuccess: () => { alert('Date selected! Event moved to Pending.'); invalidateAll(); },
     onError: (err: Error) => alert(err.message),
@@ -306,7 +306,7 @@ const ClubDetail: React.FC = () => {
     setShowEventForm(true);
   };
 
-  const handleShowAttendees = async (eventId: number, eventTitle: string) => {
+  const handleShowAttendees = async (eventId: string, eventTitle: string) => {
     setSelectedEventTitle(eventTitle);
     setShowAttendeesModal(true);
     setAttendeesLoading(true);
@@ -551,7 +551,7 @@ const ClubDetail: React.FC = () => {
                   </div>
                   <div className="form-group">
                     <label>Topics (select multiple)</label>
-                    <select multiple className="form-control" value={eventFormData.topic_ids.map(String)} onChange={(e) => { const ids = Array.from(e.target.selectedOptions, o => parseInt(o.value)); setEventFormData({...eventFormData, topic_ids: ids}); }} style={{ height: '100px' }}>
+                    <select multiple className="form-control" value={eventFormData.topic_ids.map(String)} onChange={(e) => { const ids = Array.from(e.target.selectedOptions, o => o.value); setEventFormData({...eventFormData, topic_ids: ids}); }} style={{ height: '100px' }}>
                       {topics.filter((t: Topic) => t.status === 'active').map((topic: Topic) => (
                         <option key={topic.id} value={topic.id}>{topic.title}</option>
                       ))}

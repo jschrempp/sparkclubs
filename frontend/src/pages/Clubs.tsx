@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { clubsAPI } from '../api';
 
 interface Club {
-  id: number;
+  id: string;
   name: string;
   description: string;
   zip_code: string;
@@ -60,18 +60,18 @@ const Clubs: React.FC = () => {
     onError: (err: Error) => alert(err.message),
   });
 
-  const handleJoinClub = (clubId: number) => {
+  const handleJoinClub = (clubId: string) => {
     joinMutation.mutate(clubId);
     alert('Join request sent! Waiting for admin approval.');
   };
 
-  const handleCancelRequest = (clubId: number) => {
+  const handleCancelRequest = (clubId: string) => {
     if (!window.confirm('Are you sure you want to cancel your join request?')) return;
     leaveMutation.mutate(clubId);
     alert('Join request cancelled.');
   };
 
-  const handleRejoin = (clubId: number) => {
+  const handleRejoin = (clubId: string) => {
     joinMutation.mutate(clubId);
     alert('Rejoin request sent! Waiting for admin approval.');
   };

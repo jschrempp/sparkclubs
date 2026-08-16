@@ -12,7 +12,7 @@ interface User {
   club_creation_limit: number;
   clubs_created_count: number;
   club_memberships: {
-    club_id: number;
+    club_id: string;
     club_name: string;
     status: string;
     is_admin: boolean;

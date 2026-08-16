@@ -108,6 +108,12 @@ class User(AbstractBaseUser, PermissionsMixin):
 class Club(models.Model):
     """Spark discussion club model."""
 
+    public_id = models.CharField(
+        max_length=22,
+        unique=True,
+        blank=True,
+        help_text="Opaque public identifier used in API URLs instead of the auto-increment pk.",
+    )
     name = models.CharField(max_length=200, unique=True)
     description = models.TextField()
     zip_code = models.CharField(
@@ -141,16 +147,18 @@ class Club(models.Model):
         return self.name
 
     def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self.public_id:
+            self.public_id = self._generate_unique_token(Club, "public_id")
         if not self.invite_token:
-            self.invite_token = self._generate_unique_invite_token()
+            self.invite_token = self._generate_unique_token(Club, "invite_token")
         super().save(*args, **kwargs)
 
     @staticmethod
-    def _generate_unique_invite_token() -> str:
-        """Generate a random, unguessable token for invite links."""
+    def _generate_unique_token(model_cls: type, field: str) -> str:
+        """Generate a random, unguessable token unique to *field* on *model_cls*."""
         while True:
             token = secrets.token_urlsafe(16)
-            if not Club.objects.filter(invite_token=token).exists():
+            if not model_cls.objects.filter(**{field: token}).exists():
                 return token
 
 
@@ -163,6 +171,12 @@ class ClubMembership(models.Model):
         ("removed", "Removed"),
     ]
 
+    public_id = models.CharField(
+        max_length=22,
+        unique=True,
+        blank=True,
+        help_text="Opaque public identifier used in API URLs instead of the auto-increment pk.",
+    )
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="memberships")
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="memberships")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
@@ -175,6 +189,11 @@ class ClubMembership(models.Model):
         db_table = "club_memberships"
         unique_together = [["club", "user"]]
         ordering = ["host_order", "joined_at"]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self.public_id:
+            self.public_id = Club._generate_unique_token(ClubMembership, "public_id")
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"{self.user.email} - {self.club.name} ({self.status})"
@@ -190,6 +209,12 @@ class Topic(models.Model):
         ("hidden", "Hidden"),
     ]
 
+    public_id = models.CharField(
+        max_length=22,
+        unique=True,
+        blank=True,
+        help_text="Opaque public identifier used in API URLs instead of the auto-increment pk.",
+    )
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="topics")
     title = models.CharField(max_length=500)
     description = models.CharField(max_length=200)
@@ -208,6 +233,11 @@ class Topic(models.Model):
             models.Index(fields=["title"]),
             models.Index(fields=["description"]),
         ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self.public_id:
+            self.public_id = Club._generate_unique_token(Topic, "public_id")
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"{self.title} - {self.description}"
@@ -249,6 +279,12 @@ class Event(models.Model):
         ("cancelled", "Cancelled"),
     ]
 
+    public_id = models.CharField(
+        max_length=22,
+        unique=True,
+        blank=True,
+        help_text="Opaque public identifier used in API URLs instead of the auto-increment pk.",
+    )
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="events")
     title = models.CharField(max_length=200)
     start_datetime = models.DateTimeField(null=True, blank=True)
@@ -267,6 +303,11 @@ class Event(models.Model):
             models.Index(fields=["club", "status"]),
             models.Index(fields=["start_datetime"]),
         ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self.public_id:
+            self.public_id = Club._generate_unique_token(Event, "public_id")
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"{self.title} - {self.club.name}"
@@ -314,6 +355,12 @@ class EventAttendance(models.Model):
 class EventDateOption(models.Model):
     """A proposed date/time option for an event in date_voting status."""
 
+    public_id = models.CharField(
+        max_length=22,
+        unique=True,
+        blank=True,
+        help_text="Opaque public identifier used in API calls instead of the auto-increment pk.",
+    )
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="date_options")
     start_datetime = models.DateTimeField()
     end_datetime = models.DateTimeField()
@@ -322,6 +369,11 @@ class EventDateOption(models.Model):
     class Meta:
         db_table = "event_date_options"
         ordering = ["start_datetime"]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if not self.public_id:
+            self.public_id = Club._generate_unique_token(EventDateOption, "public_id")
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"{self.event.title} - {self.start_datetime}"

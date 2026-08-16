@@ -485,6 +485,7 @@ class ClubViewSet(viewsets.ModelViewSet):
 
     queryset = Club.objects.all()
     serializer_class = ClubSerializer
+    lookup_field = "public_id"
 
     def get_queryset(self) -> Any:
         """Filter clubs based on permissions and visibility."""
@@ -671,6 +672,7 @@ class ClubMembershipViewSet(viewsets.ModelViewSet):
     queryset = ClubMembership.objects.all()
     serializer_class = ClubMembershipSerializer
     permission_classes = [IsClubAdmin]
+    lookup_field = "public_id"
 
     def get_queryset(self) -> Any:
         """Restrict to memberships of clubs the user administers."""
@@ -750,6 +752,7 @@ class TopicViewSet(viewsets.ModelViewSet):
 
     queryset = Topic.objects.all()
     serializer_class = TopicSerializer
+    lookup_field = "public_id"
 
     def get_permissions(self) -> list[Any]:
         if self.action in ["create"]:
@@ -888,6 +891,7 @@ class EventViewSet(viewsets.ModelViewSet):
 
     queryset = Event.objects.all()
     serializer_class = EventSerializer
+    lookup_field = "public_id"
 
     def get_permissions(self) -> list[Any]:
         if self.action in ["create", "update", "partial_update", "destroy"]:
@@ -985,7 +989,7 @@ class EventViewSet(viewsets.ModelViewSet):
         if not date_option_id:
             return Response({"error": "date_option_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        date_option = get_object_or_404(EventDateOption, id=date_option_id, event=event)
+        date_option = get_object_or_404(EventDateOption, public_id=date_option_id, event=event)
 
         # Toggle vote: if already voted, remove; otherwise add
         existing = EventDateVote.objects.filter(date_option=date_option, user=request.user).first()
@@ -1012,7 +1016,7 @@ class EventViewSet(viewsets.ModelViewSet):
         if not date_option_id:
             return Response({"error": "date_option_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        date_option = get_object_or_404(EventDateOption, id=date_option_id, event=event)
+        date_option = get_object_or_404(EventDateOption, public_id=date_option_id, event=event)
 
         event.start_datetime = date_option.start_datetime
         event.end_datetime = date_option.end_datetime

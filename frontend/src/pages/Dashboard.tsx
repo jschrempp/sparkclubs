@@ -5,8 +5,8 @@ import { authAPI, clubsAPI } from '../api';
 import { Link } from 'react-router-dom';
 
 interface Membership {
-  id: number;
-  club: number;
+  id: string;
+  club: string;
   club_name: string;
   club_description: string;
   club_zip_code: string;
@@ -16,15 +16,15 @@ interface Membership {
 }
 
 interface Event {
-  id: number;
+  id: string;
   title: string;
   start_datetime: string;
   end_datetime: string;
   location: string;
-  club: number;
+  club: string;
   club_name: string;
   host_name: string;
-  topics: { id: number; title: string }[];
+  topics: { id: string; title: string }[];
   attendance_count: number;
 }
 
@@ -57,7 +57,7 @@ const getStatusBadge = (status: string) => {
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [leavingClubId, setLeavingClubId] = useState<number | null>(null);
+  const [leavingClubId, setLeavingClubId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const enabled = user?.user_type !== 'pending';
@@ -75,8 +75,8 @@ const Dashboard: React.FC = () => {
   });
 
   const leaveClubMutation = useMutation({
-    mutationFn: (clubId: number) => clubsAPI.leave(clubId),
-    onSuccess: (_data: unknown, clubId: number) => {
+    mutationFn: (clubId: string) => clubsAPI.leave(clubId),
+    onSuccess: (_data: unknown, clubId: string) => {
       const clubName = (memberships as Membership[]).find(m => m.club === clubId)?.club_name || '';
       setSuccessMessage(`Successfully left "${clubName}"`);
       queryClient.invalidateQueries({ queryKey: ['myMemberships'] });
@@ -88,7 +88,7 @@ const Dashboard: React.FC = () => {
     onSettled: () => setLeavingClubId(null),
   });
 
-  const handleLeaveClub = (clubId: number, clubName: string) => {
+  const handleLeaveClub = (clubId: string, clubName: string) => {
     if (!window.confirm(`Are you sure you want to leave "${clubName}"?\n\nThis action cannot be undone.`)) return;
     setLeavingClubId(clubId);
     leaveClubMutation.mutate(clubId);

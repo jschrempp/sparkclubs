@@ -30,7 +30,7 @@ class UserSerializer(serializers.ModelSerializer):
 class UserMembershipSerializer(serializers.Serializer):
     """Nested serializer for user's club memberships in admin view."""
 
-    club_id = serializers.IntegerField()
+    club_id = serializers.CharField()
     club_name = serializers.CharField()
     status = serializers.CharField()
     is_admin = serializers.BooleanField()
@@ -70,7 +70,7 @@ class AdminUserSerializer(serializers.ModelSerializer):
         memberships = obj.memberships.select_related("club").all()
         return [
             {
-                "club_id": membership.club.id,
+                "club_id": membership.club.public_id,
                 "club_name": membership.club.name,
                 "status": membership.status,
                 "is_admin": membership.is_admin,
@@ -110,6 +110,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
 class ClubSerializer(serializers.ModelSerializer):
     """Serializer for Club model."""
 
+    id = serializers.CharField(source="public_id", read_only=True)
     member_count = serializers.SerializerMethodField()
     admin_count = serializers.SerializerMethodField()
     user_membership = serializers.SerializerMethodField()
@@ -148,7 +149,7 @@ class ClubSerializer(serializers.ModelSerializer):
         membership = obj.memberships.filter(user=request.user).first()
         if membership:
             return {
-                "id": membership.id,
+                "id": membership.public_id,
                 "status": membership.status,
                 "is_admin": membership.is_admin,
                 "joined_at": membership.joined_at,
@@ -159,6 +160,8 @@ class ClubSerializer(serializers.ModelSerializer):
 class ClubMembershipSerializer(serializers.ModelSerializer):
     """Serializer for ClubMembership model."""
 
+    id = serializers.CharField(source="public_id", read_only=True)
+    club = serializers.SlugRelatedField(slug_field="public_id", read_only=True)
     user_name = serializers.SerializerMethodField()
     club_name = serializers.CharField(source="club.name", read_only=True)
     club_description = serializers.CharField(source="club.description", read_only=True)
@@ -189,6 +192,10 @@ class ClubMembershipSerializer(serializers.ModelSerializer):
 class TopicSerializer(serializers.ModelSerializer):
     """Serializer for Topic model."""
 
+    id = serializers.CharField(source="public_id", read_only=True)
+    club = serializers.SlugRelatedField(
+        slug_field="public_id", queryset=Club.objects.all()
+    )
     created_by_name = serializers.SerializerMethodField()
     interest_counts = serializers.SerializerMethodField()
     user_interest = serializers.SerializerMethodField()
@@ -255,6 +262,7 @@ class TopicInterestSerializer(serializers.ModelSerializer):
 class EventDateOptionSerializer(serializers.ModelSerializer):
     """Serializer for EventDateOption model."""
 
+    id = serializers.CharField(source="public_id", read_only=True)
     vote_count = serializers.SerializerMethodField()
     user_voted = serializers.SerializerMethodField()
 
@@ -276,16 +284,20 @@ class EventDateOptionSerializer(serializers.ModelSerializer):
 class EventSerializer(serializers.ModelSerializer):
     """Serializer for Event model."""
 
+    id = serializers.CharField(source="public_id", read_only=True)
+    club = serializers.SlugRelatedField(
+        slug_field="public_id", queryset=Club.objects.all()
+    )
     host_name = serializers.SerializerMethodField()
     topics = serializers.SerializerMethodField()
     club_name = serializers.CharField(source="club.name", read_only=True)
     attendance_count = serializers.SerializerMethodField()
     date_options = EventDateOptionSerializer(many=True, read_only=True)
     topic_ids = serializers.ListField(
-        child=serializers.IntegerField(),
+        child=serializers.CharField(),
         write_only=True,
         required=False,
-        help_text="List of topic IDs to associate with this event",
+        help_text="List of topic public IDs to associate with this event",
     )
     date_option_dates = serializers.ListField(
         child=serializers.DictField(),
@@ -328,7 +340,7 @@ class EventSerializer(serializers.ModelSerializer):
         event_topics = obj.event_topics.select_related("topic").all()
         return [
             {
-                "id": et.topic.id,
+                "id": et.topic.public_id,
                 "title": et.topic.title,
                 "description": et.topic.description,
             }
@@ -348,14 +360,16 @@ class EventSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data: dict[str, Any]) -> Event:
         """Create event and associate topics and date options."""
-        topic_ids = validated_data.pop("topic_ids", [])
+        topic_public_ids = validated_data.pop("topic_ids", [])
         date_option_dates = validated_data.pop("date_option_dates", [])
 
         event = Event.objects.create(**validated_data)
 
-        # Create EventTopic relationships
-        for topic_id in topic_ids:
-            EventTopic.objects.create(event=event, topic_id=topic_id)
+        # Resolve topic public_ids to actual PKs
+        if topic_public_ids:
+            topic_pks = Topic.objects.filter(public_id__in=topic_public_ids).values_list("pk", flat=True)
+            for topic_pk in topic_pks:
+                EventTopic.objects.create(event=event, topic_id=topic_pk)
 
         # Create date options if provided
         for date_data in date_option_dates:
@@ -387,8 +401,10 @@ class EventSerializer(serializers.ModelSerializer):
         # Update topics if provided
         if topic_ids is not None:
             instance.event_topics.all().delete()
-            for topic_id in topic_ids:
-                EventTopic.objects.create(event=instance, topic_id=topic_id)
+            if topic_ids:
+                topic_pks = Topic.objects.filter(public_id__in=topic_ids).values_list("pk", flat=True)
+                for topic_pk in topic_pks:
+                    EventTopic.objects.create(event=instance, topic_id=topic_pk)
 
         # Update date options if provided
         if date_option_dates is not None:

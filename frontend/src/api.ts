@@ -202,7 +202,7 @@ export const clubsAPI = {
     return handleResponse(response);
   },
 
-  join: async (clubId: number) => {
+  join: async (clubId: string) => {
     const response = await apiFetch(`/clubs/${clubId}/join/`, { method: 'POST' });
     return handleResponse(response);
   },
@@ -212,7 +212,7 @@ export const clubsAPI = {
     return handleResponse(response);
   },
 
-  leave: async (clubId: number) => {
+  leave: async (clubId: string) => {
     const response = await apiFetch(`/clubs/${clubId}/leave/`, { method: 'POST' });
     return handleResponse(response);
   },
@@ -235,12 +235,12 @@ export const topicsAPI = {
     return handleResponse(response);
   },
 
-  update: async (id: number, data: Record<string, unknown>) => {
+  update: async (id: string, data: Record<string, unknown>) => {
     const response = await apiFetch(`/topics/${id}/`, { method: 'PATCH', body: data });
     return handleResponse(response);
   },
 
-  delete: async (id: number) => {
+  delete: async (id: string) => {
     const response = await apiFetch(`/topics/${id}/`, { method: 'DELETE' });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -248,7 +248,7 @@ export const topicsAPI = {
     }
   },
 
-  expressInterest: async (topicId: number, interestType: string) => {
+  expressInterest: async (topicId: string, interestType: string) => {
     const response = await apiFetch(`/topics/${topicId}/set_interest/`, {
       method: 'POST',
       body: { interest_type: interestType },
@@ -256,7 +256,7 @@ export const topicsAPI = {
     return handleResponse(response);
   },
 
-  removeInterest: async (topicId: number) => {
+  removeInterest: async (topicId: string) => {
     const response = await apiFetch(`/topics/${topicId}/remove_interest/`, { method: 'POST' });
     return handleResponse(response);
   },
@@ -274,12 +274,12 @@ export const eventsAPI = {
     return handleResponse(response);
   },
 
-  update: async (id: number, data: Record<string, unknown>) => {
+  update: async (id: string, data: Record<string, unknown>) => {
     const response = await apiFetch(`/events/${id}/`, { method: 'PATCH', body: data });
     return handleResponse(response);
   },
 
-  delete: async (id: number) => {
+  delete: async (id: string) => {
     const response = await apiFetch(`/events/${id}/`, { method: 'DELETE' });
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
@@ -287,22 +287,22 @@ export const eventsAPI = {
     }
   },
 
-  rsvp: async (eventId: number, status: string) => {
+  rsvp: async (eventId: string, status: string) => {
     const response = await apiFetch(`/events/${eventId}/rsvp/`, { method: 'POST', body: { status } });
     return handleResponse(response);
   },
 
-  attendees: async (eventId: number) => {
+  attendees: async (eventId: string) => {
     const response = await apiFetch(`/events/${eventId}/attendees/`);
     return handleResponse(response);
   },
 
-  voteDate: async (eventId: number, dateOptionId: number) => {
+  voteDate: async (eventId: string, dateOptionId: string) => {
     const response = await apiFetch(`/events/${eventId}/vote_date/`, { method: 'POST', body: { date_option_id: dateOptionId } });
     return handleResponse(response);
   },
 
-  selectDate: async (eventId: number, dateOptionId: number) => {
+  selectDate: async (eventId: string, dateOptionId: string) => {
     const response = await apiFetch(`/events/${eventId}/select_date/`, { method: 'POST', body: { date_option_id: dateOptionId } });
     return handleResponse(response);
   },
@@ -310,7 +310,7 @@ export const eventsAPI = {
 
 // Memberships API
 export const membershipsAPI = {
-  update: async (id: number, data: Record<string, unknown>) => {
+  update: async (id: string, data: Record<string, unknown>) => {
     const response = await apiFetch(`/memberships/${id}/`, { method: 'PATCH', body: data });
     return handleResponse(response);
   },
