@@ -29,7 +29,7 @@
     "build": "node generate-version.cjs && vite build",
     "preview": "vite preview",
     "preserve": "echo '\n========== STARTING SERVER ==========' && echo 'Deployed Version:' && cat dist/version.json 2>/dev/null || echo 'No version.json found' && echo '====================================\n'",
-    "serve": "serve -s dist -l $PORT",
+    "serve": "NODE_OPTIONS=--max-old-space-size=128 serve -s dist -l $PORT",
     "test": "echo \"No tests configured yet\"",
     "eject": "echo \"eject is not available with Vite\""
   },
