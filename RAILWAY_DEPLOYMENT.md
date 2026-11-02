@@ -263,6 +263,63 @@ Railway automatically scales your application. For more control:
 
 ---
 
+## Memory Tuning
+
+Railway bills by memory × time, so idle memory is a recurring cost. The defaults
+for both the MySQL template and Gunicorn are sized for much larger workloads than
+this app needs. The settings below cut idle usage substantially.
+
+### MySQL
+
+Railway's MySQL template starts `mysqld` with `--innodb-buffer-pool-size=1G`.
+InnoDB reserves that buffer pool at startup and keeps it resident even when the
+database is idle, which is the bulk of the ~380 MB you see. Override the service's
+**Start Command** (Settings → Deploy → Start Command) with:
+
+```
+docker-entrypoint.sh mysqld --innodb-use-native-aio=0 --disable-log-bin --performance_schema=0 --innodb-buffer-pool-size=128M --innodb-buffer-pool-instances=1 --max-connections=50
+```
+
+| Flag | Why |
+|------|-----|
+| `--innodb-buffer-pool-size=128M` | Dominant win; the stock 1G pool is far larger than this dataset needs |
+| `--innodb-buffer-pool-instances=1` | One pool instance instead of several; less per-instance overhead |
+| `--max-connections=50` | Caps per-connection buffers and thread stacks |
+| `--performance_schema=0` | Already in the stock command — keep it; it is worth several hundred MB |
+
+Verify the live values from the MySQL query console:
+
+```sql
+SELECT @@innodb_buffer_pool_size/1024/1024 AS buffer_pool_mb,
+       @@performance_schema AS perf_schema_on,
+       @@max_connections AS max_conns;
+```
+
+Note: overriding the start command takes the database outside Railway's managed
+template support scope. It is still the stock `mysql:8` image with only tuning
+flags changed, so the risk is low.
+
+### Backend (Gunicorn and Celery)
+
+`backend/start.sh` pins Gunicorn's worker count instead of using the default
+`(2 × CPU cores) + 1`, which can resolve to the *host's* core count inside a
+container and spawn many memory-hungry Django processes. It also runs Celery with
+a thread pool rather than `prefork`, which would otherwise fork a second full copy
+of the Django app.
+
+Tune these with environment variables on the backend service:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WEB_CONCURRENCY` | `2` | Gunicorn worker processes. Set to `1` on a 512 MB plan |
+| `WEB_THREADS` | `4` | Threads per Gunicorn worker |
+
+### Frontend
+
+`npm run serve` caps the Node heap at 128 MB via `NODE_OPTIONS=--max-old-space-size=128`.
+
+---
+
 ## Environment Variables Reference
 
 ### Backend Variables
